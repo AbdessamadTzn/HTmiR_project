@@ -5,26 +5,30 @@ Pipeline HTR (Handwritten Text Recognition) pour manuscrits médiévaux en ancie
 
 ## Équipe
 
-| Membre | Rôle |
-|---|---|
-| À compléter | Responsable technique |
-| À compléter | Responsable données |
-| À compléter | Responsable expérimentation |
-| À compléter | Responsable documentation |
+
+| Membre                                   | Rôle                        |
+| ---------------------------------------- | --------------------------- |
+| Abdessamad Touzani                       | Responsable technique       |
+| Emmanuel Mopeno-Bia                      | Responsable données         |
+| Emmanuel Mopeno-Bia / Abdessamad Touzani | Responsable expérimentation |
+| Maria Lyna Hendel                        | Responsable documentation   |
+
 
 ## Résultats
 
-| Métrique | Valeur | Seuil validation |
-|---|---|---|
-| CER global | À compléter | < 15% |
-| WER global | À compléter | < 25% |
-| IoU segmentation | À compléter | > 0.75 |
+
+| Métrique         | Valeur      | Seuil validation |
+| ---------------- | ----------- | ---------------- |
+| CER global       | À compléter | < 15%            |
+| WER global       | À compléter | < 25%            |
+| IoU segmentation | À compléter | > 0.75           |
+
 
 ## Installation
 
 ```bash
-git clone https://github.com/[groupe]/htr-medieval-manuscripts-2026
-cd htr-medieval-manuscripts-2026
+git clone https://github.com/AbdessamadTzn/HTmiR_project.git
+cd HTmiR_project
 pip install -e ".[dev]"
 ```
 
