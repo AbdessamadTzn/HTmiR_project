@@ -1,0 +1,10 @@
+# Fine-tuning TrOCR + LoRA (rang 8)
+model_id: microsoft/trocr-base-handwritten
+lora_r: 8
+lora_alpha: 16
+lora_dropout: 0.1
+learning_rate: 5.0e-5
+num_epochs: 10
+batch_size: 8
+output_dir: outputs/trocr_lora_r8
+seed: 42
