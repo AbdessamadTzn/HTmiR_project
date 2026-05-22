@@ -65,7 +65,7 @@ def build_page_xml(
     })
 
     metadata = ET.SubElement(root, "Metadata")
-    ET.SubElement(metadata, "Creator").text = "htr-medieval-manuscripts-2026"
+    ET.SubElement(metadata, "Creator").text = "htmir-vinci-2026"
     ET.SubElement(metadata, "Created").text = datetime.utcnow().isoformat()
     ET.SubElement(metadata, "LastChange").text = datetime.utcnow().isoformat()
 

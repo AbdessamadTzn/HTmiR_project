@@ -1,0 +1,21 @@
+# Corpus — carnets de Léonard de Vinci (écriture miroir)
+corpus_id: vinci-notebooks-inverted
+seed: 42
+split_by_page: true
+splits:
+  train: 0.8
+  val: 0.1
+  test: 0.1
+
+# Entrées : manifeste existant OU paires annotations/lignes + images
+manifest_in: data/processed/manifest.json
+manifest_out: data/processed/manifest.json
+test_hash_out: data/processed/test_set.sha256
+
+annotations_dir: data/annotations/lines
+image_root: data/raw
+
+# Transfert / pré-entraînement (italien manuscrit, XVe–XVIe s.)
+transfer_sources:
+  - catmus-medieval
+  - cremma-medieval

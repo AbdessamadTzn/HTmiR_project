@@ -1,1 +1,2 @@
-{"run_id": "001", "date": "2026-XX-XX", "model": "trocr-base-handwritten", "lora_r": 0, "epochs": 0, "cer_val": null, "wer_val": null, "notes": "baseline zero fine-tuning — à compléter"}
+{"run_id": "000", "date": "2026-05-22", "corpus": "vinci-notebooks-inverted", "model": "pipeline-baseline", "notes": "Initialisation projet Vinci — écriture miroir, pipeline end-to-end", "cer_val": null, "wer_val": null}
+{"run_id": "001", "date": "2026-XX-XX", "corpus": "vinci-notebooks-inverted", "model": "trocr-base-handwritten", "lora_r": 0, "mirror_normalized": true, "epochs": 0, "cer_val": null, "wer_val": null, "notes": "baseline TrOCR sans fine-tuning — à compléter"}

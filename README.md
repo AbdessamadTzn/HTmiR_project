@@ -1,94 +1,103 @@
-# htr-medieval-manuscripts-2026
+# HTmiR — HTR pour les carnets de Léonard de Vinci (écriture miroir)
 
-Pipeline HTR (Handwritten Text Recognition) pour manuscrits médiévaux en ancien/moyen français.  
-**Projet MD5 — Master Data/IA — Module Vision par ordinateur — HETIC 2026**
+Pipeline de **Handwritten Text Recognition** pour les manuscrits de Léonard de Vinci en **écriture inversée**, Volet 1 du module Vision par ordinateur — **Master Data/IA, HETIC MD5 2026**.
+
+Le JSON produit (`dataset_nlp/`) alimente le Volet 2 NLP (normalisation, NER, etc.).
 
 ## Équipe
 
+| Membre | Rôle |
+|---|---|
+| À compléter | Responsable technique (pipeline, modèles) |
+| À compléter | Responsable données (corpus Vinci, licences) |
+| À compléter | Responsable expérimentation (CER/WER, journal) |
+| À compléter | Responsable documentation (article, README) |
 
-| Membre                                   | Rôle                        |
-| ---------------------------------------- | --------------------------- |
-| Abdessamad Touzani                       | Responsable technique       |
-| Emmanuel Mopeno-Bia                      | Responsable données         |
-| Emmanuel Mopeno-Bia / Abdessamad Touzani | Responsable expérimentation |
-| Maria Lyna Hendel                        | Responsable documentation   |
+## Spécificités Vinci
 
+- **Écriture miroir** : normalisation automatique (`htmir.preprocessing.mirror`) avant HTR.
+- **Pages mixtes** texte + dessins : segmentation layout + lignes.
+- **Transfert** depuis CATMuS / CREMMA puis fine-tuning sur folios Vinci alignés.
 
-## Résultats
+## Résultats (à compléter)
 
+| Métrique | Valeur | Seuil validation |
+|---|---|---|
+| CER global | — | < 15 % |
+| WER global | — | < 25 % |
+| IoU segmentation | — | > 0,75 |
 
-| Métrique         | Valeur      | Seuil validation |
-| ---------------- | ----------- | ---------------- |
-| CER global       | À compléter | < 15%            |
-| WER global       | À compléter | < 25%            |
-| IoU segmentation | À compléter | > 0.75           |
-
+Hash test scellé : `data/processed/test_set.sha256`
 
 ## Installation
 
 ```bash
-git clone https://github.com/AbdessamadTzn/HTmiR_project.git
+git clone <url-du-depot>
 cd HTmiR_project
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
 ```
 
-## Reproduire les résultats
+## Pipeline end-to-end
 
 ```bash
-# 1. Prétraitement (deskew → CLAHE → Sauvola)
-htmir-preprocess --input data/raw/ --output data/preprocessed/
+# 1. Placer les folios numérisés dans data/raw/
 
-# 2. Segmentation + export PAGE XML (à implémenter)
-# python -m htmir.segmentation.lines --input data/preprocessed/ --output segmentations/
+# 2. Préparer le corpus (annotations .txt + images, ou manifeste)
+htmir-prepare-corpus --config configs/corpus_vinci.yaml
 
-# 3. Fine-tuning TrOCR + LoRA (config : configs/trocr_lora_r8.yaml)
-# python -m htmir.htr.finetune_trocr --config configs/trocr_lora_r8.yaml
+# 3. Prétraitement (miroir + deskew + CLAHE + Sauvola)
+htmir-preprocess --input data/raw --output data/preprocessed/
 
-# 4. Fine-tuning Kraken
-# ketos train -o outputs/kraken/ -f alto segmentations/*.xml
+# 4. Segmentation seule + PAGE XML
+htmir-segment --input data/preprocessed --output segmentations
 
-# 5. Évaluation sur le test scellé (UNE SEULE FOIS)
-# python -m htmir.evaluation.evaluate_final --model outputs/trocr_lora/ --test data/test/
+# 5. Pipeline complet → segmentations/ + dataset_nlp/vinci_output.json
+htmir-pipeline --input data/raw
 
-# 6. Tests
+# 6. Fine-tuning TrOCR + LoRA (après manifeste prêt)
+# python -m htmir.htr.finetune_trocr ...
+
+# 7. Évaluation (test scellé — une seule fois avant rendu)
+htmir-evaluate --manifest data/processed/manifest.json --predictions predictions.jsonl
+
+# 8. Tests
 pytest tests/ -v
 ```
 
-## Hash SHA-256 du test set
-
-```
-À compléter après constitution du split — NE PAS REGARDER LE TEST SET AVANT LE RENDU
-```
-
-## Structure du dépôt
+## Structure
 
 ```
 HTmiR_project/
-├── src/htmir/              # package Python installable
-│   ├── preprocessing/      # deskew, CLAHE, Sauvola, pipeline
-│   ├── segmentation/       # layout, lignes, export PAGE XML
-│   ├── htr/                # TrOCR+LoRA, Kraken, baseline
-│   ├── aggregation/        # Needleman-Wunsch, confiance, data contract
-│   ├── evaluation/         # CER, WER, bootstrap, McNemar
-│   ├── utils/              # seeds, logger, io
-│   └── cli/                # commandes (htmir-preprocess, …)
-├── tests/                  # suite pytest
-├── configs/                # hyperparamètres YAML
-├── docs/                   # conventions, sources, model card, article
-├── experiments/            # journal des runs (journal.jsonl)
+├── src/htmir/
+│   ├── preprocessing/   # miroir, deskew, CLAHE, Sauvola
+│   ├── segmentation/    # layout, lignes, PAGE XML
+│   ├── htr/             # TrOCR LoRA, Kraken, baseline
+│   ├── aggregation/     # NW, confiance, data contract JSON
+│   ├── evaluation/      # CER, WER, bootstrap, McNemar
+│   ├── corpus/          # manifeste, splits, hash test
+│   ├── pipeline/        # orchestration end-to-end
+│   └── cli/             # commandes htmir-*
+├── configs/             # corpus_vinci.yaml, trocr_lora_r8.yaml, …
+├── docs/                # conventions, sources, model card, article
 ├── data/
-│   ├── raw/                # images sources (gitignored si volumineux)
-│   └── preprocessed/       # sortie prétraitement
-├── segmentations/          # PAGE XML par page
-├── dataset_nlp/            # JSON validé (volet NLP)
-├── notebooks/              # exploration et visualisation
-├── outputs/                # checkpoints et modèles (gitignored)
-└── pyproject.toml
+├── segmentations/
+├── dataset_nlp/
+├── experiments/journal.jsonl
+└── tests/
 ```
 
-Documentation détaillée : [docs/README.md](docs/README.md).
+Documentation : [docs/README.md](docs/README.md)
 
-## Dépendances principales
+## Reproductibilité
 
-Voir `pyproject.toml` pour les versions exactes.  
-Python ≥ 3.11 requis.
+- Seed : `42` (`htmir.utils.seeds`)
+- Dépendances : `pyproject.toml`
+- Journal d’expériences : `experiments/journal.jsonl`
+- Test scellé : ne pas ouvrir avant évaluation finale
+
+## Licence & éthique
+
+Corpus sous licences documentées dans [docs/DATA_SOURCES.md](docs/DATA_SOURCES.md).  
+Section biais / représentativité : [docs/MODEL_CARD.md](docs/MODEL_CARD.md) et article scientifique.

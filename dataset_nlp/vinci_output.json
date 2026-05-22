@@ -1,0 +1,13 @@
+{
+  "metadata": {
+    "corpus": "vinci-notebooks-inverted",
+    "model": "trocr-base-handwritten-baseline",
+    "cer_global": 0.0,
+    "wer_global": 0.0,
+    "created_at": "2026-05-22T13:25:27.380881+00:00",
+    "train_hash_sha256": "",
+    "writing_system": "latin_mirror_normalized",
+    "language": "it-renaissance-autograph"
+  },
+  "pages": []
+}

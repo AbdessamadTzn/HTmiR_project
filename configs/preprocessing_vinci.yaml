@@ -1,0 +1,9 @@
+# Prétraitement adapté aux carnets Vinci (miroir + faible contraste)
+normalize_mirror: true
+force_mirror_flip: false
+auto_deskew: true
+clahe_clip_limit: 2.5
+clahe_tile_grid: [8, 8]
+sauvola_window: 31
+sauvola_k: 0.15
+sauvola_r: 128.0

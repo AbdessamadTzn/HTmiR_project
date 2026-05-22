@@ -9,6 +9,7 @@ import numpy as np
 from htmir.preprocessing.deskew import deskew
 from htmir.preprocessing.clahe import apply_clahe
 from htmir.preprocessing.binarize import sauvola_binarize
+from htmir.preprocessing.mirror import normalize_mirror_writing
 from htmir.utils.logger import get_logger
 from htmir.utils.seeds import fixer_seeds
 
@@ -26,6 +27,8 @@ class PreprocessingConfig:
         sauvola_k: Paramètre k de Sauvola.
         sauvola_r: Paramètre r de Sauvola.
         auto_deskew: Active la correction d'inclinaison automatique.
+        normalize_mirror: Retourne l'écriture miroir (Vinci) en sens de lecture.
+        force_mirror_flip: Force le flip horizontal même sans détection.
     """
     clahe_clip_limit: float = 2.0
     clahe_tile_grid: tuple[int, int] = (8, 8)
@@ -33,6 +36,8 @@ class PreprocessingConfig:
     sauvola_k: float = 0.2
     sauvola_r: float = 128.0
     auto_deskew: bool = True
+    normalize_mirror: bool = True
+    force_mirror_flip: bool = False
 
 
 @dataclass
@@ -45,12 +50,14 @@ class PreprocessingResult:
         enhanced: Image après CLAHE.
         binary: Image binarisée finale.
         skew_angle: Angle d'inclinaison détecté.
+        mirror_flipped: True si normalisation miroir appliquée.
     """
     original: np.ndarray
     deskewed: np.ndarray
     enhanced: np.ndarray
     binary: np.ndarray
     skew_angle: float
+    mirror_flipped: bool = False
 
 
 def preprocess_image(
@@ -87,6 +94,12 @@ def preprocess_image(
     if image is None:
         raise ValueError(f"Impossible de lire l'image : {image_path}")
 
+    mirror_flipped = False
+    if config.normalize_mirror:
+        image, mirror_flipped = normalize_mirror_writing(
+            image, force=config.force_mirror_flip
+        )
+
     # Étape 1 : deskew
     skew_angle = 0.0
     if config.auto_deskew:
@@ -107,13 +120,16 @@ def preprocess_image(
     binary = sauvola_binarize(gray, window_size=config.sauvola_window,
                               k=config.sauvola_k, r=config.sauvola_r)
 
-    logger.info(f"Prétraitement terminé : skew={skew_angle:.2f}°")
+    logger.info(
+        f"Prétraitement terminé : skew={skew_angle:.2f}°, miroir={mirror_flipped}"
+    )
     return PreprocessingResult(
         original=image,
         deskewed=deskewed,
         enhanced=enhanced,
         binary=binary,
         skew_angle=skew_angle,
+        mirror_flipped=mirror_flipped,
     )
 
 
@@ -146,8 +162,11 @@ def batch_preprocess(
     for img_path in images:
         try:
             result = preprocess_image(img_path, config)
-            out_path = output_dir / (img_path.stem + "_binary.png")
+            suffix = "_mirror" if result.mirror_flipped else ""
+            out_path = output_dir / f"{img_path.stem}{suffix}_binary.png"
             cv2.imwrite(str(out_path), result.binary)
+            enhanced_path = output_dir / f"{img_path.stem}{suffix}_enhanced.png"
+            cv2.imwrite(str(enhanced_path), result.enhanced)
             output_paths.append(out_path)
         except Exception as e:
             logger.error(f"Erreur sur {img_path.name} : {e}")

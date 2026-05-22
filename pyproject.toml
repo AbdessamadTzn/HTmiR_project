@@ -29,6 +29,7 @@ dependencies = [
     "kraken>=5.2.5",
     "segmentation-models-pytorch>=0.3.3",
     "huggingface-hub>=0.23.2",
+    "PyYAML>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -40,6 +41,10 @@ dev = [
 
 [project.scripts]
 htmir-preprocess = "htmir.cli.preprocess:main"
+htmir-segment = "htmir.cli.segment:main"
+htmir-prepare-corpus = "htmir.corpus.prepare:main"
+htmir-pipeline = "htmir.pipeline.run:main"
+htmir-evaluate = "htmir.evaluation.evaluate:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

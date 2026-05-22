@@ -14,9 +14,19 @@ def main() -> None:
     parser.add_argument("--input", type=Path, required=True, help="Dossier d'images sources")
     parser.add_argument("--output", type=Path, required=True, help="Dossier de sortie (binaire PNG)")
     parser.add_argument("--no-deskew", action="store_true", help="Désactiver la correction d'inclinaison")
+    parser.add_argument(
+        "--no-mirror",
+        action="store_true",
+        help="Désactiver la normalisation écriture miroir",
+    )
+    parser.add_argument("--force-mirror", action="store_true", help="Forcer le retournement horizontal")
     args = parser.parse_args()
 
-    config = PreprocessingConfig(auto_deskew=not args.no_deskew)
+    config = PreprocessingConfig(
+        auto_deskew=not args.no_deskew,
+        normalize_mirror=not args.no_mirror,
+        force_mirror_flip=args.force_mirror,
+    )
     paths = batch_preprocess(args.input, args.output, config=config)
     logger.info(f"{len(paths)} image(s) écrite(s) dans {args.output}")
 
