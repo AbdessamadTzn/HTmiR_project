@@ -18,15 +18,25 @@ Usage :
 """
 
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
 
-import boto3
-import yaml
+# Charger le .env avant tout autre import (sans dépendance python-dotenv)
+_env_file = Path(__file__).parent.parent / ".env"
+if _env_file.exists():
+    for _line in _env_file.read_text().splitlines():
+        _line = _line.strip()
+        if _line and not _line.startswith("#") and "=" in _line:
+            _k, _v = _line.split("=", 1)
+            os.environ.setdefault(_k.strip(), _v.strip())
 
 # Le script est dans infrastructure/ — ajouter src/ au path pour les imports htmir
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+import boto3  # noqa: E402
+import yaml  # noqa: E402
 from htmir.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -71,11 +81,11 @@ def build_processing_job_args(cfg: dict, job_name: str) -> dict:
     bucket = cfg["bucket"]
     region = cfg.get("region", "eu-west-3")
 
-    role_arn: str = sm.get("role_arn", "")
-    if "ACCOUNT_ID" in role_arn:
+    role_arn: str = sm.get("role_arn") or os.environ.get("SAGEMAKER_ROLE_ARN", "")
+    if not role_arn:
         raise ValueError(
-            "Le role_arn dans collection.yaml contient encore le placeholder "
-            "'ACCOUNT_ID'. Remplacez-le par votre vrai numéro de compte AWS."
+            "role_arn introuvable. Définissez SAGEMAKER_ROLE_ARN dans .env "
+            "ou renseignez sagemaker.role_arn dans collection.yaml."
         )
 
     return {
