@@ -21,6 +21,16 @@ logger = get_logger(__name__)
 _BASE_IIIF = "https://gallica.bnf.fr/iiif"
 _SRU_ENDPOINT = "https://gallica.bnf.fr/SRU"
 
+# User-Agent explicite pour usage académique (requis par Gallica pour éviter le 403)
+_HEADERS = {
+    "User-Agent": (
+        "HTmiR-Research/1.0 (HETIC Master Data/IA 2026; "
+        "academic HTR project on Leonardo da Vinci manuscripts; "
+        "non-commercial)"
+    ),
+    "Accept": "application/xml, text/xml",
+}
+
 _NS = {
     "srw": "http://www.loc.gov/zing/srw/",
     "dc": "http://purl.org/dc/elements/1.1/",
@@ -92,7 +102,7 @@ def search_vinci_manuscripts(
         logger.info(f"SRU Gallica page {start} : {url}")
 
         try:
-            resp = requests.get(url, timeout=30)
+            resp = requests.get(url, headers=_HEADERS, timeout=30)
             resp.raise_for_status()
         except requests.RequestException as exc:
             logger.error(f"Erreur SRU Gallica (startRecord={start}) : {exc}")
@@ -141,7 +151,7 @@ def fetch_iiif_manifest(ark_id: str, timeout: int = 30) -> dict:
         requests.HTTPError: Si le manifeste est inaccessible (404, 5xx…).
     """
     url = f"{_BASE_IIIF}/ark:/12148/{ark_id}/manifest.json"
-    resp = requests.get(url, timeout=timeout)
+    resp = requests.get(url, headers=_HEADERS, timeout=timeout)
     resp.raise_for_status()
     return resp.json()
 
@@ -198,7 +208,7 @@ def download_folio(
 
     for attempt in range(1, retries + 1):
         try:
-            resp = requests.get(iiif_url, timeout=60, stream=True)
+            resp = requests.get(iiif_url, headers=_HEADERS, timeout=60, stream=True)
             resp.raise_for_status()
             with open(out_path, "wb") as fh:
                 for chunk in resp.iter_content(chunk_size=65_536):

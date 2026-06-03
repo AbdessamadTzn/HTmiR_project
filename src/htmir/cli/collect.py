@@ -25,7 +25,12 @@ from htmir.collection.gallica import (
     download_folio,
     count_folios,
 )
-from htmir.collection.zenodo import search_records, download_record, deduplicate
+from htmir.collection.zenodo import (
+    search_records,
+    fetch_records_by_ids,
+    download_record,
+    deduplicate,
+)
 from htmir.collection.s3_storage import S3Storage
 from htmir.collection.manifest_builder import CollectionManifest, FolioRecord
 from htmir.collection.image_validator import validate_folio_image, is_acceptable
@@ -188,10 +193,19 @@ def collect_zenodo(
         return 0
 
     all_records = []
+
+    # Priorité 1 : IDs Zenodo explicites (datasets HTR connus)
+    known_ids = zcfg.get("known_record_ids", [])
+    if known_ids:
+        all_records.extend(
+            fetch_records_by_ids(known_ids, rate_limit=zcfg.get("rate_limit_seconds", 0.5))
+        )
+
+    # Priorité 2 : recherche textuelle en fallback
     for query in zcfg.get("queries", []):
         records = search_records(
             query,
-            size=zcfg.get("max_results_per_query", 10),
+            size=zcfg.get("max_results_per_query", 5),
             rate_limit=zcfg.get("rate_limit_seconds", 0.5),
         )
         all_records.extend(records)

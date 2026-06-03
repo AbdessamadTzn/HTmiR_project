@@ -27,13 +27,16 @@ sources:
 
   zenodo:
     enabled: true
-    # Requêtes de recherche pour les datasets de transfert HTR
-    queries:
-      - 'title:"Leonardo da Vinci" type:dataset'
-      - 'title:CREMMA medieval type:dataset'
-      - 'title:CATMuS medieval type:dataset'
-      - 'keywords:"handwritten text recognition" medieval italian type:dataset'
-    max_results_per_query: 10
+    # IDs Zenodo exacts des datasets HTR pour le transfert learning
+    # (plus fiable que la recherche textuelle)
+    known_record_ids:
+      - 7787736   # CREMMA Medieval (HTR-United — manuscrits français XIIIe-XVe s.)
+      - 5979223   # HTR-United ground truth collection v1
+      - 6827706   # e-NDP Notre-Dame de Paris (registres médiévaux)
+      - 8423161   # Gallicorpor — imprimés et manuscrits BnF
+    # Requêtes textuelles en fallback (désactivées — trop de bruit)
+    queries: []
+    max_results_per_query: 5
     s3_prefix: raw/zenodo
     rate_limit_seconds: 0.5
 

@@ -47,7 +47,71 @@ class ZenodoRecord:
         return sum(f.get("size_bytes", 0) for f in self.files) / 1_048_576
 
 
-# ── Recherche ─────────────────────────────────────────────────────────────────
+# ── Fetch par ID (méthode fiable) ────────────────────────────────────────────
+
+
+def fetch_record_by_id(record_id: int, rate_limit: float = 0.5) -> ZenodoRecord | None:
+    """Récupère un enregistrement Zenodo par son identifiant numérique.
+
+    Plus fiable que la recherche textuelle : garantit qu'on obtient exactement
+    le dataset voulu (CREMMA, HTR-United, e-NDP…).
+
+    Args:
+        record_id: Identifiant Zenodo (ex. 10552907).
+        rate_limit: Pause (s) avant la requête.
+
+    Returns:
+        :class:`ZenodoRecord` ou ``None`` si introuvable.
+    """
+    time.sleep(rate_limit)
+    url = f"https://zenodo.org/api/records/{record_id}"
+    try:
+        resp = requests.get(url, timeout=30)
+        resp.raise_for_status()
+    except requests.RequestException as exc:
+        logger.error(f"Erreur Zenodo fetch_by_id({record_id}) : {exc}")
+        return None
+
+    hit = resp.json()
+    meta = hit.get("metadata", {})
+    lic_raw = meta.get("license", {})
+    lic = lic_raw.get("id", "unknown") if isinstance(lic_raw, dict) else str(lic_raw)
+    files = [
+        {"key": f["key"], "url": f["links"]["self"], "size_bytes": f.get("size", 0)}
+        for f in hit.get("files", [])
+    ]
+    record = ZenodoRecord(
+        record_id=int(hit["id"]),
+        title=meta.get("title", ""),
+        doi=hit.get("doi", ""),
+        licence=lic,
+        files=files,
+    )
+    logger.info(f"Zenodo record {record_id} : {record.title!r} ({len(files)} fichier(s))")
+    return record
+
+
+def fetch_records_by_ids(
+    record_ids: list[int], rate_limit: float = 0.5
+) -> list[ZenodoRecord]:
+    """Récupère une liste d'enregistrements Zenodo par leurs IDs.
+
+    Args:
+        record_ids: Liste d'identifiants Zenodo.
+        rate_limit: Pause entre chaque requête.
+
+    Returns:
+        Liste de :class:`ZenodoRecord` valides (les échecs sont ignorés).
+    """
+    results = []
+    for rid in record_ids:
+        rec = fetch_record_by_id(rid, rate_limit=rate_limit)
+        if rec:
+            results.append(rec)
+    return results
+
+
+# ── Recherche textuelle (fallback) ────────────────────────────────────────────
 
 
 def search_records(
