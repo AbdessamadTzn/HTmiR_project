@@ -117,9 +117,20 @@ def build_processing_job_args(cfg: dict, job_name: str) -> dict:
                 },
             },
         ],
-        # Le manifeste est pushé directement vers S3 par le script collect.py
-        # (pas de sortie SageMaker dédiée — évite la copie double)
-        "ProcessingOutputConfig": {"Outputs": []},
+        # Le manifeste est pushé directement vers S3 par le script collect.py.
+        # SageMaker exige au moins une sortie — on mappe le dossier de logs.
+        "ProcessingOutputConfig": {
+            "Outputs": [
+                {
+                    "OutputName": "logs",
+                    "S3Output": {
+                        "S3Uri": f"s3://{bucket}/logs/collection/",
+                        "LocalPath": "/opt/ml/processing/output/logs",
+                        "S3UploadMode": "EndOfJob",
+                    },
+                }
+            ]
+        },
         "RoleArn": role_arn,
         "StoppingCondition": {
             "MaxRuntimeInSeconds": sm.get("max_runtime_seconds", 14_400)

@@ -48,11 +48,11 @@ validation:
 # ── SageMaker Processing Job ──────────────────────────────────────
 sagemaker:
   # Remplacer ACCOUNT_ID et le nom du rôle par les vôtres
-  role_arn: "arn:aws:iam::ACCOUNT_ID:role/SageMakerExecutionRole"
+  role_arn: "arn:aws:iam::815023191269:role/sagemaker-rimes-role"
   instance_type: ml.t3.medium
   instance_count: 1
   volume_size_gb: 50
   max_runtime_seconds: 14400  # 4 heures max
   # Image AWS Deep Learning Containers — PyTorch CPU (disponible dans toutes les régions)
   # Format : {account}.dkr.ecr.{region}.amazonaws.com/{image}:{tag}
-  container_image: "763104351884.dkr.ecr.eu-west-3.amazonaws.com/pytorch-training:2.1.0-cpu-py310-ubuntu20.04-ec2"
+  container_image: "763104351884.dkr.ecr.eu-west-3.amazonaws.com/pytorch-training:2.3.0-cpu-py311-ubuntu20.04-sagemaker"
