@@ -92,6 +92,10 @@ def build_processing_job_args(cfg: dict, job_name: str) -> dict:
             # Installe le package HTmiR depuis les sources montées, puis lance la collecte
             "ContainerEntrypoint": ["bash", "-c"],
             "ContainerArguments": [
+                # 1. Downgrade numpy to 1.x pour compatibilité avec le cv2 précompilé du conteneur
+                # 2. Installer le package HTmiR depuis les sources montées
+                # 3. Lancer la collecte
+                "pip install --quiet 'numpy<2.0,>=1.26.4' && "
                 "pip install --quiet -e /opt/ml/processing/input/code && "
                 "htmir-collect "
                 "--config /opt/ml/processing/input/config/collection.yaml"
