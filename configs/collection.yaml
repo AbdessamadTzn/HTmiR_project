@@ -1,0 +1,58 @@
+# ─────────────────────────────────────────────────────────────────
+# HTmiR — Configuration de collecte de données
+# Sources : Gallica BnF (IIIF) + Zenodo (REST)
+# Stockage : AWS S3 bucket htmir-data
+# ─────────────────────────────────────────────────────────────────
+
+bucket: htmir-data
+region: eu-west-3          # Paris — à ajuster selon votre compte AWS
+
+# ── Sources ──────────────────────────────────────────────────────
+sources:
+
+  gallica:
+    enabled: true
+    # Requête SRU Dublin Core pour les manuscrits de Léonard de Vinci
+    search_query: 'dc.creator all "Léonard de Vinci" and dc.type all "manuscrit"'
+    max_results: 120
+    # Largeur IIIF (ex. "2000," = max 2000px, "full" = résolution native)
+    iiif_width: "2000,"
+    s3_prefix: raw/gallica
+    rate_limit_seconds: 1.5   # Respecter le fair-use Gallica
+
+    # ARK de secours si la recherche SRU retourne peu de résultats.
+    # Format : identifiant sans le préfixe "ark:/12148/"
+    # (compléter au fur et à mesure de la collecte)
+    fallback_arks: []
+
+  zenodo:
+    enabled: true
+    # Requêtes de recherche pour les datasets de transfert HTR
+    queries:
+      - 'title:"Leonardo da Vinci" type:dataset'
+      - 'title:CREMMA medieval type:dataset'
+      - 'title:CATMuS medieval type:dataset'
+      - 'keywords:"handwritten text recognition" medieval italian type:dataset'
+    max_results_per_query: 10
+    s3_prefix: raw/zenodo
+    rate_limit_seconds: 0.5
+
+# ── Validation qualité avant upload ──────────────────────────────
+validation:
+  min_width_px: 1200
+  min_height_px: 800
+  max_blank_ratio: 0.95       # Page considérée vide au-dessus de 95 % de fond clair
+  min_ink_density: 0.005      # Moins de 0.5 % de pixels encre → rejet
+  max_bleedthrough_score: 0.4 # Score 0–1 ; au-dessus → dégradation trop forte
+
+# ── SageMaker Processing Job ──────────────────────────────────────
+sagemaker:
+  # Remplacer ACCOUNT_ID et le nom du rôle par les vôtres
+  role_arn: "arn:aws:iam::ACCOUNT_ID:role/SageMakerExecutionRole"
+  instance_type: ml.t3.medium
+  instance_count: 1
+  volume_size_gb: 50
+  max_runtime_seconds: 14400  # 4 heures max
+  # Image AWS Deep Learning Containers — PyTorch CPU (disponible dans toutes les régions)
+  # Format : {account}.dkr.ecr.{region}.amazonaws.com/{image}:{tag}
+  container_image: "763104351884.dkr.ecr.eu-west-3.amazonaws.com/pytorch-training:2.1.0-cpu-py310-ubuntu20.04-ec2"

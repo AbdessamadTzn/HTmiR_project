@@ -30,6 +30,8 @@ dependencies = [
     "segmentation-models-pytorch>=0.3.3",
     "huggingface-hub>=0.23.2",
     "PyYAML>=6.0",
+    "boto3>=1.34.0",
+    "requests>=2.32.0",
 ]
 
 [project.optional-dependencies]
@@ -45,6 +47,7 @@ htmir-segment = "htmir.cli.segment:main"
 htmir-prepare-corpus = "htmir.corpus.prepare:main"
 htmir-pipeline = "htmir.pipeline.run:main"
 htmir-evaluate = "htmir.evaluation.evaluate:main"
+htmir-collect = "htmir.cli.collect:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
