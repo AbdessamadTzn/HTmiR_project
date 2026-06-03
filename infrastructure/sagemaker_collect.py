@@ -92,11 +92,17 @@ def build_processing_job_args(cfg: dict, job_name: str) -> dict:
             # Installe le package HTmiR depuis les sources montées, puis lance la collecte
             "ContainerEntrypoint": ["bash", "-c"],
             "ContainerArguments": [
-                # 1. Downgrade numpy to 1.x pour compatibilité avec le cv2 précompilé du conteneur
-                # 2. Installer le package HTmiR depuis les sources montées
-                # 3. Lancer la collecte
-                "pip install --quiet 'numpy<2.0,>=1.26.4' && "
-                "pip install --quiet -e /opt/ml/processing/input/code && "
+                # Installer le package sans ses dépendances lourdes (torch, kraken…
+                # déjà dans le conteneur ou inutiles pour la collecte), puis
+                # les seules dépendances runtime nécessaires au scraping,
+                # en pinant numpy<2.0 pour compatibilité avec le cv2 du conteneur.
+                "pip install --quiet --no-deps -e /opt/ml/processing/input/code && "
+                "pip install --quiet "
+                "'numpy>=1.26.4,<2.0' "
+                "'requests>=2.32.0' "
+                "'boto3>=1.34.0' "
+                "'Pillow>=10.3.0' "
+                "'PyYAML>=6.0' && "
                 "htmir-collect "
                 "--config /opt/ml/processing/input/config/collection.yaml"
             ],
