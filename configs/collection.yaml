@@ -41,6 +41,18 @@ sources:
     rate_limit_seconds: 0.5
 
 # ── Validation qualité avant upload ──────────────────────────────
+  huggingface:
+    enabled: true
+    datasets:
+      - repo_id: CATMuS/medieval
+        split: train
+        max_samples: 3000
+        s3_prefix: raw/huggingface/catmus-medieval
+      - repo_id: HTR-United/cremma-medieval
+        split: train
+        max_samples: 2000
+        s3_prefix: raw/huggingface/cremma-medieval
+
 validation:
   min_width_px: 1200
   min_height_px: 800

@@ -20,6 +20,7 @@ from pathlib import Path
 
 import yaml
 
+from htmir.collection.huggingface_loader import collect_all_hf_datasets
 from htmir.collection.gallica import (
     search_vinci_manuscripts,
     download_folio,
@@ -273,7 +274,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--source",
-        choices=["gallica", "zenodo", "all"],
+        choices=["gallica", "zenodo", "huggingface", "all"],
         default="all",
         help="Source(s) à collecter",
     )
@@ -299,7 +300,7 @@ def main() -> None:
     storage = S3Storage(bucket=cfg["bucket"], region=cfg.get("region", "eu-west-3"))
     manifest = CollectionManifest.load_from_s3(storage)
 
-    n_gallica, n_zenodo = 0, 0
+    n_gallica, n_zenodo, n_hf = 0, 0, 0
 
     if args.source in ("gallica", "all"):
         n_gallica = collect_gallica(cfg, storage, manifest, validate=not args.skip_validation)
@@ -307,13 +308,31 @@ def main() -> None:
     if args.source in ("zenodo", "all"):
         n_zenodo = collect_zenodo(cfg, storage, manifest)
 
+    if args.source in ("huggingface", "all"):
+        hf_cfg = cfg.get("sources", {}).get("huggingface", {})
+        if hf_cfg.get("enabled", True):
+            hf_results = collect_all_hf_datasets(storage, hf_cfg.get("datasets"))
+            n_hf = sum(len(v) for v in hf_results.values())
+            for repo_id, samples in hf_results.items():
+                for s in samples:
+                    manifest.add(
+                        __import__("htmir.collection.manifest_builder", fromlist=["FolioRecord"]).FolioRecord(
+                            folio_id=s.sample_id,
+                            source="huggingface",
+                            s3_uri=s.image_s3_uri,
+                            licence="cc-by-4.0",
+                            status="validated",
+                        )
+                    )
+
     manifest.push_to_s3(storage)
 
     stats = manifest.stats()
     logger.info(
-        f"Collecte terminée — Gallica : {n_gallica} folio(s) | "
-        f"Zenodo : {n_zenodo} fichier(s) | "
-        f"Stats manifeste : {stats}"
+        f"Collecte terminée — Gallica : {n_gallica} | "
+        f"Zenodo : {n_zenodo} | "
+        f"HuggingFace : {n_hf} | "
+        f"Stats : {stats}"
     )
 
 

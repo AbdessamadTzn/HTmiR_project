@@ -112,9 +112,12 @@ def build_processing_job_args(cfg: dict, job_name: str) -> dict:
                 "'requests>=2.32.0' "
                 "'boto3>=1.34.0' "
                 "'Pillow>=10.3.0' "
-                "'PyYAML>=6.0' && "
+                "'PyYAML>=6.0' "
+                "'datasets>=2.19.1' "
+                "'huggingface-hub>=0.23.2' && "
                 "htmir-collect "
-                "--config /opt/ml/processing/input/config/collection.yaml"
+                "--config /opt/ml/processing/input/config/collection.yaml "
+                "--source huggingface"
             ],
         },
         "ProcessingInputs": [
