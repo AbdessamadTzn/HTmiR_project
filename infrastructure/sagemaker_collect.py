@@ -99,25 +99,10 @@ def build_processing_job_args(cfg: dict, job_name: str) -> dict:
         },
         "AppSpecification": {
             "ImageUri": _container_image(cfg),
-            # Installe le package HTmiR depuis les sources montées, puis lance la collecte
-            "ContainerEntrypoint": ["bash", "-c"],
-            "ContainerArguments": [
-                # Installer le package sans ses dépendances lourdes (torch, kraken…
-                # déjà dans le conteneur ou inutiles pour la collecte), puis
-                # les seules dépendances runtime nécessaires au scraping,
-                # en pinant numpy<2.0 pour compatibilité avec le cv2 du conteneur.
-                "pip install --quiet --no-deps -e /opt/ml/processing/input/code && "
-                "pip install --quiet "
-                "'numpy>=1.26.4,<2.0' "
-                "'requests>=2.32.0' "
-                "'boto3>=1.34.0' "
-                "'Pillow>=10.3.0' "
-                "'PyYAML>=6.0' "
-                "'datasets>=2.19.1' "
-                "'huggingface-hub>=0.23.2' && "
-                "htmir-collect "
-                "--config /opt/ml/processing/input/config/collection.yaml "
-                "--source huggingface"
+            # Script dédié — évite la limite SageMaker de 256 chars par argument
+            "ContainerEntrypoint": [
+                "python3",
+                "/opt/ml/processing/input/code/infrastructure/container_entrypoint.py",
             ],
         },
         "ProcessingInputs": [
