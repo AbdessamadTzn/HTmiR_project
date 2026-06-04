@@ -172,11 +172,12 @@ def upload_code_and_config(cfg_path: Path, cfg: dict) -> None:
     s3.upload_file(str(cfg_path), bucket, "configs/collection.yaml")
     logger.info(f"Config uploadée : s3://{bucket}/configs/collection.yaml")
 
-    # Code source (src/ + pyproject.toml)
+    # Code source (src/ + infrastructure/ + pyproject.toml)
     project_root = cfg_path.parent.parent
     code_files = (
         list((project_root / "src").rglob("*.py"))
         + list((project_root / "src").rglob("*.toml"))
+        + list((project_root / "infrastructure").rglob("*.py"))
         + [project_root / "pyproject.toml"]
         + [project_root / "README.md"]
     )
