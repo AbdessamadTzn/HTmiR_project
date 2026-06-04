@@ -48,10 +48,10 @@ sources:
         split: train
         max_samples: 3000
         s3_prefix: raw/huggingface/catmus-medieval
-      - repo_id: HTR-United/cremma-medieval
+      - repo_id: Teklia/POPP
         split: train
         max_samples: 2000
-        s3_prefix: raw/huggingface/cremma-medieval
+        s3_prefix: raw/huggingface/teklia-popp
 
 validation:
   min_width_px: 1200

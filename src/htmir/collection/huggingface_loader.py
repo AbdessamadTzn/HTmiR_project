@@ -129,13 +129,16 @@ def collect_hf_dataset(
         logger.error(f"Impossible de charger {repo_id} : {exc}")
         return []
 
-    # Vérifier que les colonnes nécessaires sont présentes
+    # Détecter les colonnes image et texte (noms variables selon le dataset)
     available = set(ds.column_names)
-    has_image = "image" in available
-    has_text = "text" in available or "transcription" in available
-    if not (has_image and has_text):
+    IMAGE_COLS = ["image", "im", "img", "scan", "page_image"]
+    TEXT_COLS  = ["text", "transcription", "ground_truth", "label"]
+    image_col = next((c for c in IMAGE_COLS if c in available), None)
+    text_col  = next((c for c in TEXT_COLS  if c in available), None)
+    if not image_col or not text_col:
         logger.error(f"{repo_id} : colonnes manquantes (disponibles : {available})")
         return []
+    logger.info(f"{repo_id} : image='{image_col}', text='{text_col}'")
 
     import tempfile
     samples_out: list[HFSample] = []
@@ -150,6 +153,13 @@ def collect_hf_dataset(
             if count >= max_samples:
                 break
 
+            # Normaliser les noms de colonnes pour _save_sample_locally
+            normalized = dict(row)
+            if image_col != "image":
+                normalized["image"] = normalized.pop(image_col)
+            if text_col != "text":
+                normalized["text"] = normalized.pop(text_col)
+
             # Skip si déjà sur S3
             img_key = f"{s3_prefix}/line_{idx:06d}.jpg"
             if storage.exists(img_key):
@@ -157,7 +167,7 @@ def collect_hf_dataset(
                 count += 1
                 continue
 
-            result = _save_sample_locally(idx, row, out_dir, repo_id)
+            result = _save_sample_locally(idx, normalized, out_dir, repo_id)
             if result is None:
                 continue
 
