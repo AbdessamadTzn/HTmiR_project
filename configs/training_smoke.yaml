@@ -20,9 +20,10 @@ output:
   s3_prefix: "datasets/catmus-french-13c-smoke"   # chemin séparé du dataset réel
 
 model:
-  base_model_doi: "10.5281/zenodo.10592716"
+  base_model_doi: "10.5281/zenodo.15030337"   # CATMuS Medieval v1.6.0
   base_model_path: ""
   output_name: "htmir-french-13c-smoke"
+  require_finetuning: true
 
 training:
   epochs: 4                # smoke : juste valider que ça apprend

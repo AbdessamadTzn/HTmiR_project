@@ -25,11 +25,12 @@ output:
 
 # ── Modèle Kraken ────────────────────────────────────────────────
 model:
-  # Modèle de base à fine-tuner. Récupéré via `kraken get <DOI>` dans le conteneur.
-  # CATMuS Medieval (reconnaissance) — laisser vide pour entraîner from scratch.
-  base_model_doi: "10.5281/zenodo.10592716"   # CATMuS-Medieval (à confirmer via `kraken list`)
+  # Modèle de base à fine-tuner. Récupéré via `kraken get <DOI>`.
+  # CATMuS Medieval v1.6.0 (reconnaissance manuscrits médiévaux).
+  base_model_doi: "10.5281/zenodo.15030337"   # CATMuS Medieval (catmus-medieval-1.6.0.mlmodel)
   base_model_path: ""      # chemin local .mlmodel si déjà téléchargé (prioritaire sur le DOI)
   output_name: "htmir-french-13c"
+  require_finetuning: true # le brief impose le fine-tuning : échoue si le modèle de base manque
 
 # ── Hyperparamètres d'entraînement (ketos train) ─────────────────
 training:
