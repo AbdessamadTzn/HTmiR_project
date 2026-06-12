@@ -2,6 +2,8 @@
 
 from pathlib import Path
 
+import pytest
+
 from htmir.training import train_kraken
 
 
@@ -116,3 +118,41 @@ def test_run_compiles_and_trains(tmp_path, monkeypatch):
     assert calls[1][:2] == ["ketos", "compile"]
     assert calls[2][:2] == ["ketos", "train"]
     assert "--load" in calls[2]   # fine-tuning depuis base.mlmodel
+
+
+def test_run_raises_when_finetuning_required_but_no_base(tmp_path, monkeypatch):
+    """Le brief impose le fine-tuning : run() lève si le modèle de base manque."""
+    data_dir = tmp_path / "data"
+    (data_dir / "train").mkdir(parents=True)
+    (data_dir / "train" / "line_000000.png").touch()
+
+    monkeypatch.setattr(train_kraken.subprocess, "run", lambda cmd, **k: None)
+    # fetch_base_model échoue (pas de kraken)
+    monkeypatch.setattr(train_kraken, "fetch_base_model", lambda doi, d: None)
+
+    cfg = {
+        "model": {"base_model_doi": "10.5281/zenodo.bad", "require_finetuning": True},
+        "training": {"epochs": 1, "device": "cpu"},
+    }
+    with pytest.raises(RuntimeError, match="Fine-tuning requis"):
+        train_kraken.run(cfg, data_dir)
+
+
+def test_run_allows_scratch_when_explicitly_disabled(tmp_path, monkeypatch):
+    """Si require_finetuning=False, l'entraînement from scratch est autorisé."""
+    data_dir = tmp_path / "data"
+    (data_dir / "train").mkdir(parents=True)
+    (data_dir / "train" / "line_000000.png").touch()
+
+    calls = []
+    monkeypatch.setattr(train_kraken.subprocess, "run", lambda cmd, **k: calls.append(cmd))
+    monkeypatch.setattr(train_kraken, "fetch_base_model", lambda doi, d: None)
+
+    cfg = {
+        "model": {"base_model_doi": "x", "require_finetuning": False},
+        "training": {"epochs": 1, "device": "cpu"},
+    }
+    train_kraken.run(cfg, data_dir)
+    # entraînement lancé sans --load
+    train_cmd = next(c for c in calls if c[:2] == ["ketos", "train"])
+    assert "--load" not in train_cmd
