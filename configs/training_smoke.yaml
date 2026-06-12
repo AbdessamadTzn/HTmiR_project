@@ -1,0 +1,42 @@
+# ─────────────────────────────────────────────────────────────────
+# HTmiR — Config SMOKE (validation rapide de la chaîne sur SageMaker)
+# Échantillon réduit + peu d'epochs : valide prepare→train→eval→upload.
+# NE PAS utiliser pour le run final (voir training.yaml).
+# ─────────────────────────────────────────────────────────────────
+
+dataset:
+  hf_repo: "CATMuS/medieval"
+  filter:
+    language: "French"
+    century: 13
+  splits: ["train", "validation", "test"]
+  max_files: null          # scan tous les fichiers (français 13e dispersé)…
+  max_samples: 100         # …mais s'arrête à 100 lignes par split
+
+output:
+  local_dir: "data/catmus-french-13c-smoke"
+  bucket: "htmir-data"
+  region: "eu-west-3"
+  s3_prefix: "datasets/catmus-french-13c-smoke"   # chemin séparé du dataset réel
+
+model:
+  base_model_doi: "10.5281/zenodo.10592716"
+  base_model_path: ""
+  output_name: "htmir-french-13c-smoke"
+
+training:
+  epochs: 4                # smoke : juste valider que ça apprend
+  lr: 0.0001
+  batch_size: 16
+  early_stopping_patience: 3
+  validation_split: 0.1
+  device: "cuda:0"
+  workers: 2
+
+sagemaker:
+  role_arn: ""
+  instance_type: "ml.g4dn.xlarge"
+  instance_count: 1
+  volume_size_gb: 50
+  max_runtime_seconds: 3600        # cap 1h pour le smoke
+  container_image: "763104351884.dkr.ecr.eu-west-3.amazonaws.com/pytorch-training:2.3.0-gpu-py311-cu121-ubuntu20.04-sagemaker"
