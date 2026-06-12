@@ -95,16 +95,19 @@ def test_fetch_base_model_finds_downloaded_model(tmp_path, monkeypatch):
 
 
 def test_run_compiles_and_trains(tmp_path, monkeypatch):
-    """run() doit compiler train+val puis lancer l'entraînement (3 appels)."""
+    """run() compile train+val (subprocess.run) puis entraîne (run_logged_command)."""
     data_dir = tmp_path / "data"
     (data_dir / "train").mkdir(parents=True)
     (data_dir / "validation").mkdir(parents=True)
     (data_dir / "train" / "line_000000.png").touch()
     (data_dir / "validation" / "line_000000.png").touch()
 
-    calls = []
+    compiles = []
+    trains = []
     monkeypatch.setattr(train_kraken.subprocess, "run",
-                        lambda cmd, **k: calls.append(cmd))
+                        lambda cmd, **k: compiles.append(cmd))
+    monkeypatch.setattr(train_kraken, "run_logged_command",
+                        lambda cmd, log: trains.append((cmd, log)))
 
     cfg = {
         "model": {"base_model_path": "base.mlmodel", "output_name": "htmir-french-13c"},
@@ -112,12 +115,31 @@ def test_run_compiles_and_trains(tmp_path, monkeypatch):
     }
     train_kraken.run(cfg, data_dir)
 
-    # 2 compile (train + val) + 1 train
-    assert len(calls) == 3
-    assert calls[0][:2] == ["ketos", "compile"]
-    assert calls[1][:2] == ["ketos", "compile"]
-    assert calls[2][:2] == ["ketos", "train"]
-    assert "--load" in calls[2]   # fine-tuning depuis base.mlmodel
+    # 2 compile (train + val)
+    assert len(compiles) == 2
+    assert all(c[:2] == ["ketos", "compile"] for c in compiles)
+    # 1 entraînement loggé, avec --load (fine-tuning) et log dans data_dir/train.log
+    assert len(trains) == 1
+    train_cmd, log_path = trains[0]
+    assert train_cmd[:2] == ["ketos", "train"]
+    assert "--load" in train_cmd
+    assert log_path == data_dir / "train.log"
+
+
+def test_run_logged_command_writes_log(tmp_path):
+    """run_logged_command capture la sortie dans un fichier ET ne lève pas si OK."""
+    log = tmp_path / "sub" / "train.log"
+    train_kraken.run_logged_command(["echo", "epoch 1 done"], log)
+    assert log.exists()
+    assert "epoch 1 done" in log.read_text(encoding="utf-8")
+
+
+def test_run_logged_command_raises_on_failure(tmp_path):
+    """Une commande qui échoue lève CalledProcessError."""
+    import subprocess
+    log = tmp_path / "train.log"
+    with pytest.raises(subprocess.CalledProcessError):
+        train_kraken.run_logged_command(["false"], log)
 
 
 def test_run_raises_when_finetuning_required_but_no_base(tmp_path, monkeypatch):
@@ -144,9 +166,11 @@ def test_run_allows_scratch_when_explicitly_disabled(tmp_path, monkeypatch):
     (data_dir / "train").mkdir(parents=True)
     (data_dir / "train" / "line_000000.png").touch()
 
-    calls = []
-    monkeypatch.setattr(train_kraken.subprocess, "run", lambda cmd, **k: calls.append(cmd))
+    monkeypatch.setattr(train_kraken.subprocess, "run", lambda cmd, **k: None)
     monkeypatch.setattr(train_kraken, "fetch_base_model", lambda doi, d: None)
+    trains = []
+    monkeypatch.setattr(train_kraken, "run_logged_command",
+                        lambda cmd, log: trains.append(cmd))
 
     cfg = {
         "model": {"base_model_doi": "x", "require_finetuning": False},
@@ -154,5 +178,5 @@ def test_run_allows_scratch_when_explicitly_disabled(tmp_path, monkeypatch):
     }
     train_kraken.run(cfg, data_dir)
     # entraînement lancé sans --load
-    train_cmd = next(c for c in calls if c[:2] == ["ketos", "train"])
-    assert "--load" not in train_cmd
+    assert len(trains) == 1
+    assert "--load" not in trains[0]
