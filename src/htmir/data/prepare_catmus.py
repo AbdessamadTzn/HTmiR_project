@@ -184,6 +184,17 @@ def prepare(cfg: dict, overrides: dict) -> dict:
     logger.info(f"Manifeste écrit : {manifest_path}")
     logger.info(f"TOTAL : {summary['total']} lignes extraites dans {out_root}")
 
+    # Persistance S3 (source de vérité du dataset)
+    if overrides.get("push_s3"):
+        import boto3  # noqa: PLC0415
+        from htmir.data.s3_sync import upload_dataset  # noqa: PLC0415
+
+        out_cfg = cfg["output"]
+        s3 = boto3.client("s3", region_name=out_cfg.get("region", "eu-west-3"))
+        keys = upload_dataset(out_root, out_cfg["bucket"], out_cfg["s3_prefix"], s3)
+        summary["s3_keys"] = keys
+        logger.info(f"Dataset poussé sur S3 : {len(keys)} objet(s)")
+
     return summary
 
 
@@ -199,6 +210,8 @@ def main() -> None:
                         help="Limite le nb de lignes extraites par split (test rapide)")
     parser.add_argument("--output-dir", type=str, default=None,
                         help="Surcharge le répertoire de sortie")
+    parser.add_argument("--push-s3", action="store_true",
+                        help="Uploade le dataset préparé sur S3 (source de vérité)")
     args = parser.parse_args()
 
     with open(args.config, encoding="utf-8") as fh:
@@ -208,6 +221,7 @@ def main() -> None:
         "max_files": args.max_files,
         "max_samples": args.max_samples,
         "output_dir": args.output_dir,
+        "push_s3": args.push_s3,
     }
     prepare(cfg, overrides)
 
