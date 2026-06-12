@@ -16,6 +16,7 @@ Usage :
 
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 
 import yaml
@@ -23,6 +24,32 @@ import yaml
 from htmir.utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+
+def run_logged_command(cmd: list[str], log_path: Path) -> None:
+    """Exécute une commande en « tee-ant » sa sortie vers la console et un fichier.
+
+    Le log d'entraînement est ensuite parsé par le dashboard pour tracer les
+    courbes CER/loss et les markers d'early-stopping.
+
+    Args:
+        cmd: Commande à exécuter (argv).
+        log_path: Fichier où enregistrer stdout+stderr.
+
+    Raises:
+        subprocess.CalledProcessError: si la commande échoue.
+    """
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(log_path, "w", encoding="utf-8") as fh:
+        proc = subprocess.Popen(
+            cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        )
+        for line in proc.stdout:
+            sys.stdout.write(line)
+            fh.write(line)
+        proc.wait()
+        if proc.returncode != 0:
+            raise subprocess.CalledProcessError(proc.returncode, cmd)
 
 
 def build_compile_cmd(image_dir: Path, output_arrow: Path) -> list[str]:
@@ -149,13 +176,14 @@ def run(cfg: dict, data_dir: Path) -> Path:
             )
         logger.warning("Modèle de base indisponible — entraînement from scratch (autorisé)")
 
-    # 3. Fine-tuning
+    # 3. Fine-tuning (log capturé pour le dashboard)
     output_name = mcfg.get("output_name", "htmir-model")
+    log_path = data_dir / "train.log"
     cmd = build_train_cmd(train_arrow, val_arrow, output_name, hp, base_model)
-    logger.info(f"Lancement de l'entraînement : {' '.join(cmd)}")
-    subprocess.run(cmd, check=True)
+    logger.info(f"Lancement de l'entraînement (log → {log_path}) : {' '.join(cmd)}")
+    run_logged_command(cmd, log_path)
 
-    logger.info(f"Entraînement terminé — modèle : {output_name}")
+    logger.info(f"Entraînement terminé — modèle : {output_name} | log : {log_path}")
     return Path(output_name)
 
 
