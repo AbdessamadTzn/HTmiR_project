@@ -1,0 +1,52 @@
+# ─────────────────────────────────────────────────────────────────
+# HTmiR — Configuration fine-tuning HTR français médiéval
+# Dataset : CATMuS Medieval (HuggingFace)  •  Modèle : Kraken
+# ─────────────────────────────────────────────────────────────────
+
+# ── Source de données ────────────────────────────────────────────
+dataset:
+  hf_repo: "CATMuS/medieval"
+  # Filtre appliqué sur les colonnes du dataset
+  filter:
+    language: "French"
+    century: 13            # XIIIe siècle (slice le plus riche, gothique textualis)
+  # Splits physiques du dataset parquet à parcourir
+  splits: ["train", "validation", "test"]
+  # Limites (null = tout). Utile pour les tests rapides.
+  max_files: null          # nb max de fichiers parquet par split (null = tous)
+  max_samples: null        # nb max de lignes extraites par split (null = toutes)
+
+# ── Sortie locale / S3 ───────────────────────────────────────────
+output:
+  local_dir: "data/catmus-french-13c"   # lignes image + .gt.txt
+  bucket: "htmir-data"
+  region: "eu-west-3"
+  s3_prefix: "datasets/catmus-french-13c"
+
+# ── Modèle Kraken ────────────────────────────────────────────────
+model:
+  # Modèle de base à fine-tuner. Récupéré via `kraken get <DOI>` dans le conteneur.
+  # CATMuS Medieval (reconnaissance) — laisser vide pour entraîner from scratch.
+  base_model_doi: "10.5281/zenodo.10592716"   # CATMuS-Medieval (à confirmer via `kraken list`)
+  base_model_path: ""      # chemin local .mlmodel si déjà téléchargé (prioritaire sur le DOI)
+  output_name: "htmir-french-13c"
+
+# ── Hyperparamètres d'entraînement (ketos train) ─────────────────
+training:
+  epochs: 50
+  lr: 0.0001
+  batch_size: 32
+  early_stopping_patience: 10
+  validation_split: 0.1    # part du train utilisée en val si pas de split dédié
+  device: "cuda:0"         # "cpu" en local, "cuda:0" sur SageMaker GPU
+  workers: 4
+
+# ── SageMaker Training Job ───────────────────────────────────────
+sagemaker:
+  role_arn: ""             # via SAGEMAKER_ROLE_ARN ou rempli ici
+  instance_type: "ml.g4dn.xlarge"   # 1 GPU T4 — suffisant pour Kraken
+  instance_count: 1
+  volume_size_gb: 50
+  max_runtime_seconds: 86400        # 24h max
+  # Image AWS DLC PyTorch GPU
+  container_image: "763104351884.dkr.ecr.eu-west-3.amazonaws.com/pytorch-training:2.3.0-gpu-py311-cu121-ubuntu20.04-sagemaker"
