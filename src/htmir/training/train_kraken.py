@@ -136,8 +136,18 @@ def run(cfg: dict, data_dir: Path) -> Path:
     if not base_model and mcfg.get("base_model_doi"):
         fetched = fetch_base_model(mcfg["base_model_doi"], data_dir)
         base_model = str(fetched) if fetched else None
-        if base_model is None:
-            logger.warning("Modèle de base indisponible — entraînement from scratch")
+
+    # Le brief impose le fine-tuning : on refuse de partir from scratch en silence.
+    require_finetuning = mcfg.get("require_finetuning", True)
+    if base_model is None:
+        if require_finetuning:
+            raise RuntimeError(
+                "Fine-tuning requis mais modèle de base introuvable "
+                f"(doi={mcfg.get('base_model_doi')!r}, path={mcfg.get('base_model_path')!r}). "
+                "Vérifiez le DOI/chemin, ou mettez model.require_finetuning=false "
+                "pour autoriser un entraînement from scratch."
+            )
+        logger.warning("Modèle de base indisponible — entraînement from scratch (autorisé)")
 
     # 3. Fine-tuning
     output_name = mcfg.get("output_name", "htmir-model")
