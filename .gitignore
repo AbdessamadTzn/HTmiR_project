@@ -18,3 +18,4 @@ data/processed/
 *.pt
 *.bin
 *.safetensors
+.venv/
