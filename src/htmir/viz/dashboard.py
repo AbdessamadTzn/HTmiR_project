@@ -26,9 +26,9 @@ st.sidebar.title("📜 HTmiR")
 st.sidebar.caption("HTR français médiéval — XIIIe siècle (CATMuS)")
 
 data_dir = Path(st.sidebar.text_input("Répertoire données", "data/catmus-french-13c"))
-train_log = Path(st.sidebar.text_input("Log entraînement", "logs/train.log"))
-metrics_csv = Path(st.sidebar.text_input("Métriques CSV", "logs/training_metrics.csv"))
-eval_report = Path(st.sidebar.text_input("Rapport éval", "eval_report.json"))
+train_log = Path(st.sidebar.text_input("Log entraînement", "data/catmus-french-13c/train.log"))
+metrics_csv = Path(st.sidebar.text_input("Métriques CSV", "data/catmus-french-13c/training_metrics.csv"))
+eval_report = Path(st.sidebar.text_input("Rapport éval", "data/catmus-french-13c/eval_report.json"))
 preds_csv = Path(st.sidebar.text_input("Prédictions CSV", "predictions.csv"))
 patience = st.sidebar.number_input("Patience (early-stopping)", 1, 50, 10)
 
