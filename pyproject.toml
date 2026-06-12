@@ -41,6 +41,7 @@ viz = [
 [project.scripts]
 htmir-prepare = "htmir.data.prepare_catmus:main"
 htmir-evaluate = "htmir.eval.evaluate:main"
+htmir-train-local = "htmir.cli.run_local:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
