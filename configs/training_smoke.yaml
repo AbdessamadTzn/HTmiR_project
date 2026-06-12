@@ -30,13 +30,13 @@ training:
   batch_size: 16
   early_stopping_patience: 3
   validation_split: 0.1
-  device: "cuda:0"
+  device: "cpu"            # smoke sur CPU (quota GPU = 0 sur le compte)
   workers: 2
 
 sagemaker:
   role_arn: ""
-  instance_type: "ml.g4dn.xlarge"
+  instance_type: "ml.t3.xlarge"    # CPU 4 vCPU / 16 Go (quota dispo)
   instance_count: 1
   volume_size_gb: 50
   max_runtime_seconds: 3600        # cap 1h pour le smoke
-  container_image: "763104351884.dkr.ecr.eu-west-3.amazonaws.com/pytorch-training:2.3.0-gpu-py311-cu121-ubuntu20.04-sagemaker"
+  container_image: "763104351884.dkr.ecr.eu-west-3.amazonaws.com/pytorch-training:2.3.0-cpu-py311-ubuntu20.04-sagemaker"
