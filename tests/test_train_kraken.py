@@ -10,50 +10,65 @@ from htmir.training import train_kraken
 # ── build_compile_cmd ───────────────────────────────────────────────────────
 
 
-def test_build_compile_cmd_basic(tmp_path):
-    """La commande compile doit cibler le format 'path' et lister les PNG."""
-    (tmp_path / "line_000000.png").touch()
+def test_write_compile_manifest_lists_sorted_pngs(tmp_path):
+    """Le manifeste doit contenir les PNG triés, un par ligne."""
     (tmp_path / "line_000001.png").touch()
+    (tmp_path / "line_000000.png").touch()
+    manifest = train_kraken.write_compile_manifest(tmp_path)
+    lines = manifest.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 2
+    assert lines == sorted(lines)
+
+
+def test_build_compile_cmd_uses_manifest_file(tmp_path):
+    """La commande compile passe les chemins via --files (pas en argv)."""
+    (tmp_path / "line_000000.png").touch()
+    manifest = train_kraken.write_compile_manifest(tmp_path)
     out = tmp_path / "train.arrow"
 
-    cmd = train_kraken.build_compile_cmd(tmp_path, out)
+    cmd = train_kraken.build_compile_cmd(manifest, out)
 
-    assert cmd[:2] == ["ketos", "compile"]
+    assert cmd[1] == "compile"
     assert "--format-type" in cmd and "path" in cmd
     assert "--output" in cmd
     assert str(out) in cmd
-    # Les deux images doivent être présentes et triées
-    pngs = [c for c in cmd if c.endswith(".png")]
-    assert len(pngs) == 2
-    assert pngs == sorted(pngs)
+    assert "--files" in cmd
+    assert str(manifest) in cmd
+    assert not any(c.endswith(".png") for c in cmd)
 
 
 # ── build_train_cmd ─────────────────────────────────────────────────────────
 
 
-def test_build_train_cmd_finetune_includes_base_model():
-    """En fine-tuning, --load et --resize union doivent être présents."""
+def test_build_train_cmd_finetune_includes_base_model(tmp_path):
+    """En fine-tuning, -i et --resize union doivent être présents (Kraken 7)."""
     hp = {"epochs": 30, "lr": 1e-4, "batch_size": 16, "device": "cuda:0",
           "early_stopping_patience": 5, "workers": 2}
+    val_arrow = tmp_path / "val.arrow"
+    val_arrow.touch()
     cmd = train_kraken.build_train_cmd(
-        Path("train.arrow"), Path("val.arrow"), "out", hp,
+        tmp_path / "train.arrow", val_arrow, "out", hp,
         base_model="base.mlmodel",
     )
-    assert "--load" in cmd
+    assert cmd.index("train") > cmd.index("-d")
+    assert "-i" in cmd
     assert "base.mlmodel" in cmd
     assert "--resize" in cmd and "union" in cmd
-    assert "--evaluation-files" in cmd and "val.arrow" in cmd
-    assert cmd[-1] == "train.arrow"   # train en positionnel final
+    assert "-e" in cmd
+    eval_manifest = tmp_path / "val_ketos_manifest.txt"
+    assert str(eval_manifest) in cmd
+    assert eval_manifest.read_text(encoding="utf-8").strip().endswith("val.arrow")
+    assert cmd[-1] == str((tmp_path / "train.arrow").resolve())
 
 
 def test_build_train_cmd_from_scratch_no_load():
-    """Sans modèle de base, pas de --load ni --resize."""
+    """Sans modèle de base, pas de -i ni --resize."""
     cmd = train_kraken.build_train_cmd(
         Path("train.arrow"), None, "out", {}, base_model=None,
     )
-    assert "--load" not in cmd
+    assert "-i" not in cmd
     assert "--resize" not in cmd
-    assert "--evaluation-files" not in cmd   # pas de val
+    assert "-e" not in cmd   # pas de val
 
 
 def test_build_train_cmd_hyperparams_propagated():
@@ -72,11 +87,50 @@ def test_build_train_cmd_hyperparams_propagated():
 
 
 def test_fetch_base_model_returns_none_on_missing_kraken(tmp_path, monkeypatch):
-    """Si `kraken` n'est pas installé, fetch_base_model retourne None."""
+    """Si `kraken` n'est pas installé et Zenodo échoue, fetch_base_model retourne None."""
     def boom(*a, **k):
         raise FileNotFoundError("kraken introuvable")
     monkeypatch.setattr(train_kraken.subprocess, "run", boom)
+    monkeypatch.setattr(train_kraken, "fetch_base_model_zenodo", lambda doi, d: None)
     assert train_kraken.fetch_base_model("10.5281/zenodo.1", tmp_path) is None
+
+
+def test_fetch_base_model_zenodo_downloads_mlmodel(tmp_path, monkeypatch):
+    """Le fallback Zenodo écrit le .mlmodel attendu."""
+    import requests
+
+    class MetaResp:
+        def json(self):
+            return {
+                "files": [{
+                    "key": "catmus.mlmodel",
+                    "size": 11,
+                    "links": {"self": "https://zenodo.example/dl"},
+                }],
+            }
+
+    class DownloadResp:
+        def raise_for_status(self):
+            return None
+
+        def iter_content(self, chunk_size=0):
+            yield b"model-bytes"
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def fake_get(url, **kw):
+        if "api/records" in url:
+            return MetaResp()
+        return DownloadResp()
+
+    monkeypatch.setattr(requests, "get", fake_get)
+    result = train_kraken.fetch_base_model_zenodo("10.5281/zenodo.99", tmp_path)
+    assert result == tmp_path / "catmus.mlmodel"
+    assert result.read_bytes() == b"model-bytes"
 
 
 def test_fetch_base_model_finds_downloaded_model(tmp_path, monkeypatch):
@@ -95,7 +149,7 @@ def test_fetch_base_model_finds_downloaded_model(tmp_path, monkeypatch):
 
 
 def test_run_compiles_and_trains(tmp_path, monkeypatch):
-    """run() compile train+val (subprocess.run) puis entraîne (run_logged_command)."""
+    """run() compile train+val puis entraîne via run_kraken_train."""
     data_dir = tmp_path / "data"
     (data_dir / "train").mkdir(parents=True)
     (data_dir / "validation").mkdir(parents=True)
@@ -104,10 +158,15 @@ def test_run_compiles_and_trains(tmp_path, monkeypatch):
 
     compiles = []
     trains = []
-    monkeypatch.setattr(train_kraken.subprocess, "run",
-                        lambda cmd, **k: compiles.append(cmd))
-    monkeypatch.setattr(train_kraken, "run_logged_command",
-                        lambda cmd, log: trains.append((cmd, log)))
+    monkeypatch.setattr(train_kraken, "compile_split",
+                        lambda img_dir, out: compiles.append((img_dir, out)))
+    monkeypatch.setattr(
+        train_kraken,
+        "run_kraken_train",
+        lambda train_a, val_a, out, hp, base, log: trains.append(
+            (train_a, val_a, out, hp, base, log),
+        ),
+    )
 
     cfg = {
         "model": {"base_model_path": "base.mlmodel", "output_name": "htmir-french-13c"},
@@ -117,12 +176,15 @@ def test_run_compiles_and_trains(tmp_path, monkeypatch):
 
     # 2 compile (train + val)
     assert len(compiles) == 2
-    assert all(c[:2] == ["ketos", "compile"] for c in compiles)
-    # 1 entraînement loggé, avec --load (fine-tuning) et log dans data_dir/train.log
+    assert compiles[0][0].name == "train"
+    assert compiles[1][0].name == "validation"
+    # 1 entraînement API, fine-tuning avec modèle de base
     assert len(trains) == 1
-    train_cmd, log_path = trains[0]
-    assert train_cmd[:2] == ["ketos", "train"]
-    assert "--load" in train_cmd
+    train_a, val_a, out, _hp, base, log_path = trains[0]
+    assert train_a == data_dir / "train.arrow"
+    assert val_a == data_dir / "val.arrow"
+    assert out == "htmir-french-13c"
+    assert base == "base.mlmodel"
     assert log_path == data_dir / "train.log"
 
 
@@ -148,7 +210,7 @@ def test_run_raises_when_finetuning_required_but_no_base(tmp_path, monkeypatch):
     (data_dir / "train").mkdir(parents=True)
     (data_dir / "train" / "line_000000.png").touch()
 
-    monkeypatch.setattr(train_kraken.subprocess, "run", lambda cmd, **k: None)
+    monkeypatch.setattr(train_kraken, "compile_split", lambda img_dir, out: None)
     # fetch_base_model échoue (pas de kraken)
     monkeypatch.setattr(train_kraken, "fetch_base_model", lambda doi, d: None)
 
@@ -166,17 +228,20 @@ def test_run_allows_scratch_when_explicitly_disabled(tmp_path, monkeypatch):
     (data_dir / "train").mkdir(parents=True)
     (data_dir / "train" / "line_000000.png").touch()
 
-    monkeypatch.setattr(train_kraken.subprocess, "run", lambda cmd, **k: None)
+    monkeypatch.setattr(train_kraken, "compile_split", lambda img_dir, out: None)
     monkeypatch.setattr(train_kraken, "fetch_base_model", lambda doi, d: None)
     trains = []
-    monkeypatch.setattr(train_kraken, "run_logged_command",
-                        lambda cmd, log: trains.append(cmd))
+    monkeypatch.setattr(
+        train_kraken,
+        "run_kraken_train",
+        lambda train_a, val_a, out, hp, base, log: trains.append(base),
+    )
 
     cfg = {
         "model": {"base_model_doi": "x", "require_finetuning": False},
         "training": {"epochs": 1, "device": "cpu"},
     }
     train_kraken.run(cfg, data_dir)
-    # entraînement lancé sans --load
+    # entraînement lancé sans modèle de base
     assert len(trains) == 1
-    assert "--load" not in trains[0]
+    assert trains[0] is None
