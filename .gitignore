@@ -216,3 +216,17 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- HTmiR : artefacts locaux (datasets, modeles, exports) ---
+data/
+_dashboard_export/
+htmir-dashboard-artifacts.zip
+
+# Sorties d'entrainement Kraken (checkpoints, poids)
+htmir-french-13c/
+htmir-french-13c-*/
+htmir-french-13c_best.safetensors
+*.ckpt
+*.safetensors
+*.arrow
+*.mlmodel
