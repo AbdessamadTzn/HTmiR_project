@@ -20,6 +20,7 @@ import json
 import subprocess
 from pathlib import Path
 
+from htmir.training.train_kraken import _ketos_bin
 from htmir.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -118,10 +119,11 @@ def build_ketos_test_cmd(model: Path, test_arrow: Path, device: str = "cpu") -> 
         Liste argv prête pour ``subprocess.run``.
     """
     return [
-        "ketos", "test",
-        "--model", str(model),
-        "--format-type", "binary",
-        "--device", device,
+        _ketos_bin(),
+        "-d", device,
+        "test",
+        "-m", str(model),
+        "-f", "binary",
         str(test_arrow),
     ]
 

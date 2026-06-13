@@ -92,10 +92,11 @@ def test_corpus_metrics_perfect_corpus():
 
 def test_build_ketos_test_cmd():
     cmd = evaluate.build_ketos_test_cmd(Path("m.mlmodel"), Path("test.arrow"), "cuda:0")
-    assert cmd[:2] == ["ketos", "test"]
-    assert "--model" in cmd and "m.mlmodel" in cmd
-    assert "--format-type" in cmd and "binary" in cmd
-    assert "--device" in cmd and "cuda:0" in cmd
+    assert "test" in cmd
+    assert cmd.index("test") > cmd.index("-d")
+    assert "-m" in cmd and "m.mlmodel" in cmd
+    assert "-f" in cmd and "binary" in cmd
+    assert "cuda:0" in cmd
     assert cmd[-1] == "test.arrow"
 
 
