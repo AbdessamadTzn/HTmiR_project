@@ -1,0 +1,263 @@
+\documentclass[11pt,a4paper]{article}
+
+% ── Encodage et langue ───────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+
+% ── Mise en page et figures ──────────────────────────────────────
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{hyperref}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{authblk}
+
+\hypersetup{colorlinks=true, linkcolor=black, urlcolor=blue, citecolor=blue}
+
+% ── Métadonnées ──────────────────────────────────────────────────
+\title{\textbf{HTmiR} : reconnaissance automatique de l'écriture\\
+manuscrite pour le français médiéval --- vers les\\
+carnets spéculaires de Léonard de Vinci}
+
+\author[1]{Abdessamad Touzani}
+\author[1]{Emmanuel (morningstar-manu)}
+\affil[1]{HETIC --- Master Recherche, Module Computer Vision (2026)}
+\date{Juin 2026}
+
+\begin{document}
+\maketitle
+
+% ─────────────────────────────────────────────────────────────────
+\begin{abstract}
+\noindent
+La reconnaissance automatique de l'écriture manuscrite (\textit{Handwritten
+Text Recognition}, HTR) appliquée aux manuscrits médiévaux reste un défi en
+raison de la diversité des mains, des abréviations et de la rareté des données
+annotées. Notre objectif à long terme est la transcription des
+\emph{carnets en écriture spéculaire} de Léonard de Vinci. Faute de vérité
+terrain disponible pour ces manuscrits, nous construisons et validons d'abord
+un pipeline HTR reproductible sur le \emph{français médiéval du XIII\textsuperscript{e}
+siècle}, à partir du corpus \textbf{CATMuS Medieval}. Nous fine-tunons le modèle
+Kraken \textit{CATMuS Medieval} sur \(\sim\)21\,000 lignes filtrées, et
+obtenons un taux d'erreur caractère (CER) de validation d'environ
+\textbf{4,5\,\%}, sous notre cible de 8\,\%. Cet article décrit la collecte des
+données, la méthode de fine-tuning, les résultats, ainsi que les perspectives
+d'application à l'écriture de Léonard de Vinci.
+\end{abstract}
+
+% ─────────────────────────────────────────────────────────────────
+\section{Introduction}
+
+Léonard de Vinci (1452--1519) a rédigé la quasi-totalité de ses milliers de
+pages de carnets en \emph{écriture spéculaire} (ou écriture en miroir~: de
+droite à gauche, lettres inversées). Ces manuscrits, en italien toscan du
+Quattrocento, constituent un patrimoine scientifique majeur mais difficilement
+exploitable~: leur transcription complète à la main représenterait des milliers
+d'heures de travail expert.
+
+L'ambition initiale de ce projet était d'entraîner un modèle HTR capable de lire
+directement cette écriture spéculaire. Cependant, une contrainte fondamentale
+est rapidement apparue~: \textbf{il n'existe pas de vérité terrain} (paires
+image/transcription alignées) publiquement disponible pour les manuscrits de
+Léonard de Vinci. Or, le fine-tuning supervisé d'un modèle HTR exige
+précisément de telles paires.
+
+Nous adoptons donc une démarche \emph{progressive et transférable}~: plutôt que
+d'annoter manuellement des dizaines de pages de Vinci (travail hors de portée
+dans le temps imparti), nous construisons et validons un pipeline HTR complet
+sur un corpus médiéval richement annoté --- le \textbf{français du
+XIII\textsuperscript{e} siècle} issu de CATMuS Medieval --- en écriture gothique
+\textit{textualis}. L'écriture gothique partage avec l'écriture de Vinci la
+densité, les abréviations et les ligatures qui font la difficulté du HTR
+ancien. Le pipeline ainsi éprouvé constitue la base directement réutilisable
+pour une future campagne d'annotation et de fine-tuning sur les carnets de
+Léonard de Vinci.
+
+\paragraph{Contributions.} (i) Un pipeline reproductible de collecte et de
+préparation de données HTR depuis CATMuS Medieval~; (ii) le fine-tuning d'un
+modèle Kraken atteignant un CER de validation d'environ 4,5\,\%~; (iii) un
+tableau de bord de visualisation des résultats~; (iv) une discussion des
+perspectives vers l'écriture spéculaire de Léonard de Vinci.
+
+% ─────────────────────────────────────────────────────────────────
+\section{Contexte et travaux liés}
+
+\paragraph{HTR et Kraken.} Kraken est un moteur HTR libre largement utilisé en
+humanités numériques, gérant la segmentation en lignes (\textit{baseline}) et la
+reconnaissance via des réseaux récurrents entraînés par perte CTC
+(\textit{Connectionist Temporal Classification}). Il produit des sorties au
+format PAGE/ALTO XML, standard pour l'édition savante.
+
+\paragraph{CATMuS Medieval.} CATMuS (\textit{Consistent Approach to
+Transcribing ManuScripts}) est un effort communautaire de normalisation des
+transcriptions de manuscrits médiévaux. Le corpus \textit{CATMuS Medieval}
+agrège des manuscrits du VIII\textsuperscript{e} au XVI\textsuperscript{e}
+siècle dans plusieurs langues, avec une transcription cohérente. Un modèle
+Kraken pré-entraîné est distribué avec le corpus.
+
+\paragraph{Transfert d'apprentissage.} Le fine-tuning d'un modèle déjà entraîné
+sur le médiéval, plutôt qu'un apprentissage \textit{from scratch}, permet
+d'atteindre de bonnes performances avec peu de données et limite le
+sur-apprentissage~: les poids appris encodent déjà les formes générales de
+l'écriture ancienne, que l'on spécialise ensuite sur une langue/période.
+
+% ─────────────────────────────────────────────────────────────────
+\section{Données}
+
+\paragraph{Source et filtrage.} Nous partons du dataset HuggingFace
+\texttt{CATMuS/medieval}. Chaque entrée fournit une \emph{ligne} de texte déjà
+découpée (image) accompagnée de sa transcription et de métadonnées (langue,
+siècle, type d'écriture). Nous filtrons sur
+\texttt{language = "French"} et \texttt{century = 13}. Le français du
+XIII\textsuperscript{e} siècle est le sous-ensemble francophone le plus
+volumineux et homogène du corpus (gothique \textit{textualis}).
+
+\paragraph{Extraction efficace.} Les fichiers parquet de CATMuS pèsent
+\(\sim\)25\,Go (images incluses). Pour éviter leur téléchargement intégral,
+nous interrogeons les colonnes \texttt{language}/\texttt{century} via DuckDB
+(\textit{predicate pushdown}) et ne matérialisons que les lignes pertinentes.
+Les couples image (\texttt{.png}) / transcription (\texttt{.gt.txt}) sont
+organisés par split (\textit{train}/\textit{validation}/\textit{test}) au format
+attendu par Kraken, puis archivés sur stockage objet (AWS S3) comme source de
+vérité.
+
+\paragraph{Volumétrie.} L'extraction produit \(\sim\)21\,000 lignes annotées
+(\(\sim\)19\,200 en entraînement, \(\sim\)970 en validation, \(\sim\)1\,370 en
+test). Les transcriptions préservent les abréviations médiévales
+(p.\,ex. \textit{\&} tironien, voyelles nasalisées \textit{õ}, \textit{ẽ}),
+couvrant un alphabet de 252 symboles.
+
+% ─────────────────────────────────────────────────────────────────
+\section{Méthode}
+
+\paragraph{Pré-traitement.} CATMuS fournissant des lignes déjà segmentées,
+aucune segmentation de page n'est requise en amont. Les images sont décodées et
+normalisées (conversion RVB), Kraken appliquant ensuite sa propre normalisation
+de hauteur lors de la compilation du jeu de données.
+
+\paragraph{Fine-tuning.} Nous fine-tunons le modèle de base
+\textit{CATMuS Medieval} (Kraken) via \texttt{ketos}. Le drapeau
+\texttt{-{}-resize union} fusionne l'alphabet du modèle de base avec les
+caractères propres à notre sous-corpus, sans réinitialiser les poids appris.
+Le tableau~\ref{tab:hp} récapitule les hyperparamètres.
+
+\begin{table}[h]
+\centering
+\caption{Hyperparamètres d'entraînement.}
+\label{tab:hp}
+\begin{tabular}{ll}
+\toprule
+Paramètre & Valeur \\
+\midrule
+Modèle de base & CATMuS Medieval (Kraken) \\
+Taux d'apprentissage & $1\times10^{-4}$ \\
+Taille de batch & 8 \\
+Epochs (max) & 50 \\
+Patience (early stopping) & 10 \\
+Découpe validation & 10\,\% \\
+Matériel & GPU NVIDIA RTX 4060 (8\,Go) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Métriques.} La reconnaissance est évaluée par le \textbf{CER}
+(\textit{Character Error Rate}) et le \textbf{WER} (\textit{Word Error Rate}),
+fondés sur la distance d'édition de Levenshtein~:
+\[
+\mathrm{CER} = \frac{\text{distance d'édition (caractères)}}{\text{nombre de caractères de référence}}.
+\]
+Le CER est notre métrique principale, avec une cible de $\mathrm{CER} < 8\,\%$,
+seuil usuel d'exploitabilité pour le médiéval.
+
+\paragraph{Reproductibilité.} L'ensemble du pipeline (préparation, entraînement,
+évaluation) est piloté par configuration et couvert par des tests unitaires
+(\texttt{pytest}). Les données et le modèle sont versionnés/stockés sur S3.
+
+% ─────────────────────────────────────────────────────────────────
+\section{Résultats}
+
+L'entraînement converge rapidement et l'\textit{early stopping} interrompt
+l'apprentissage lorsque le CER de validation cesse de s'améliorer. La
+meilleure accuracy caractère de validation atteinte est de \textbf{95,5\,\%},
+soit un \textbf{CER d'environ 4,5\,\%} --- nettement sous la cible de 8\,\%
+(figure~\ref{fig:cer}). La figure~\ref{fig:acc} montre l'évolution conjointe
+des précisions caractère et mot.
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.75\linewidth]{figures/cer_par_epoch.pdf}
+\caption{Taux d'erreur caractère (CER) de validation par epoch. La ligne
+pointillée indique la cible de 8\,\%~; le point vert marque le meilleur epoch.}
+\label{fig:cer}
+\end{figure}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.75\linewidth]{figures/accuracy_par_epoch.pdf}
+\caption{Précision caractère et précision mot (validation) par epoch.}
+\label{fig:acc}
+\end{figure}
+
+\paragraph{Validation qualitative.} Appliqué à une page complète de manuscrit
+français (segmentation \textit{baseline} Kraken puis reconnaissance), le modèle
+segmente et transcrit les lignes de texte gothique, illustrant l'enchaînement
+segmentation~$\rightarrow$~reconnaissance du pipeline.
+
+% ─────────────────────────────────────────────────────────────────
+\section{Discussion et limites}
+
+\paragraph{Segmentation.} Le travail porte sur la \emph{reconnaissance} de
+lignes pré-segmentées (fournies par CATMuS). L'évaluation d'un segmenteur de
+page (et la métrique IoU associée) constitue une extension naturelle, réalisable
+sans ré-entraînement du modèle de reconnaissance (réutilisation du segmenteur
+Kraken pré-entraîné).
+
+\paragraph{Évaluation sur le test.} L'évaluation automatisée sur le \textit{test
+set} via \texttt{ketos test} s'est heurtée à une incompatibilité de la version
+Kraken~7 avec les jeux binaires~; les métriques rapportées sont donc celles de
+validation. Une évaluation \textit{test} dédiée fait partie des travaux à
+finaliser.
+
+\paragraph{Portée du transfert.} Les résultats valident le pipeline sur le
+français médiéval. Le transfert vers l'écriture spéculaire de Léonard de Vinci
+reste conditionné à la constitution d'une vérité terrain spécifique~: l'écriture
+en miroir nécessite a minima un retournement horizontal des images, puis une
+phase d'annotation.
+
+% ─────────────────────────────────────────────────────────────────
+\section{Conclusion et perspectives}
+
+Nous avons construit un pipeline HTR reproductible et fine-tuné un modèle Kraken
+sur le français du XIII\textsuperscript{e} siècle, atteignant un CER de
+validation d'environ 4,5\,\%. Ce résultat valide la chaîne complète --- collecte,
+préparation, fine-tuning, évaluation, visualisation --- et fournit une base
+solide pour l'objectif initial.
+
+Les prochaines étapes sont~: (i) l'ajout d'un volet \emph{segmentation} avec
+métrique IoU~; (ii) une évaluation \textit{test} robuste~; (iii) la constitution
+progressive d'une vérité terrain pour les carnets de Léonard de Vinci
+(retournement des images spéculaires, annotation assistée, puis fine-tuning du
+présent modèle comme point de départ). À terme, le modèle pourrait transcrire
+automatiquement des milliers de pages aujourd'hui difficilement accessibles,
+ouvrant ce patrimoine aux historiens des sciences.
+
+% ─────────────────────────────────────────────────────────────────
+\section*{Disponibilité}
+Code, configuration et tests sont disponibles dans le dépôt du projet. Les
+figures de cet article sont générées automatiquement depuis les métriques
+d'entraînement (\texttt{paper/make\_figures.py}).
+
+\begin{thebibliography}{9}
+\bibitem{kraken} B. Kiessling. \textit{Kraken --- an universal text recognizer
+for the humanities}. Digital Humanities, 2019.
+\bibitem{catmus} S. Torres Aguilar et al. \textit{CATMuS Medieval: A
+multilingual large-scale cross-century dataset in Latin script for handwritten
+text recognition}. 2024.
+\bibitem{ctc} A. Graves et al. \textit{Connectionist Temporal Classification}.
+ICML, 2006.
+\end{thebibliography}
+
+\end{document}
