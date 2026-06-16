@@ -16,10 +16,16 @@ python paper/make_figures.py
 Lit `data/catmus-french-13c/training_metrics.csv` et écrit les `.pdf`/`.png`
 dans `figures/`.
 
+## Format
+
+L'article utilise la classe **IEEEtran** (format 2 colonnes de journal
+scientifique). Cette classe est incluse par défaut sur Overleaf — rien à
+installer.
+
 ## Compiler le PDF
 
-**Option A — Overleaf** : créer un projet, copier `article.tex` + le dossier
-`figures/`, compiler.
+**Option A — Overleaf** (recommandé) : New Project → Upload Project → glisser
+`article.tex` + le dossier `figures/` → compiler. IEEEtran est déjà disponible.
 
 **Option B — Local** (distribution TeX installée) :
 ```bash
