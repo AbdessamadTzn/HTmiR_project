@@ -250,8 +250,10 @@ with tab_demo:
             col_img.subheader("Image")
             col_img.image(str(img_path), use_container_width=True)
 
-            kraken_bin = shutil.which("kraken") or ".venv/bin/kraken"
-            if not Path(kraken_bin).exists() and not shutil.which("kraken"):
+            # Priorité au kraken HTR du venv (évite le kraken bio-informatique apt)
+            venv_kraken = Path(__file__).resolve().parents[3] / ".venv/bin/kraken"
+            kraken_bin = str(venv_kraken) if venv_kraken.exists() else shutil.which("kraken")
+            if not kraken_bin or not Path(kraken_bin).exists():
                 col_txt.error(
                     "Kraken introuvable. Installe-le avec :\n```\npip install kraken\n```"
                 )
