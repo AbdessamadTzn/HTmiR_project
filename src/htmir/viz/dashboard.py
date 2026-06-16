@@ -43,8 +43,8 @@ def _load_training_rows() -> list[dict]:
     return []
 
 
-tab_overview, tab_data, tab_train, tab_eval, tab_compare = st.tabs(
-    ["Vue d'ensemble", "Dataset", "Entraînement", "Évaluation", "Comparaison"]
+tab_overview, tab_data, tab_train, tab_eval, tab_compare, tab_demo = st.tabs(
+    ["Vue d'ensemble", "Dataset", "Entraînement", "Évaluation", "Comparaison", "🔍 Tester le modèle"]
 )
 
 
@@ -219,6 +219,78 @@ with tab_eval:
             st.divider()
     else:
         st.caption("Fournis un CSV de prédictions (ref,hyp,image_path) pour le diagnostic.")
+
+
+# ── 6. DÉMO OCR ──────────────────────────────────────────────────────────────
+with tab_demo:
+    import subprocess
+    import shutil
+    import tempfile
+
+    st.header("🔍 Tester le modèle sur une image")
+    st.caption(
+        "Upload une image de manuscrit (PNG/JPG) → Kraken segmente les lignes "
+        "et transcrit avec le modèle fine-tuné."
+    )
+
+    model_path = Path(st.text_input(
+        "Chemin du modèle",
+        "htmir-french-13c_best.safetensors",
+    ))
+
+    uploaded = st.file_uploader("Image manuscrit", type=["png", "jpg", "jpeg", "tif", "tiff"])
+
+    if uploaded:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            img_path = tmp / uploaded.name
+            img_path.write_bytes(uploaded.read())
+
+            col_img, col_txt = st.columns([1, 1])
+            col_img.subheader("Image")
+            col_img.image(str(img_path), use_container_width=True)
+
+            kraken_bin = shutil.which("kraken") or ".venv/bin/kraken"
+            if not Path(kraken_bin).exists() and not shutil.which("kraken"):
+                col_txt.error(
+                    "Kraken introuvable. Installe-le avec :\n```\npip install kraken\n```"
+                )
+            elif not model_path.exists():
+                col_txt.error(
+                    f"Modèle introuvable : `{model_path}`\n\n"
+                    "Place `htmir-french-13c_best.safetensors` à la racine du projet."
+                )
+            else:
+                out_txt = tmp / "output.txt"
+                cmd = [
+                    kraken_bin,
+                    "-i", str(img_path), str(out_txt),
+                    "segment", "-bl",
+                    "ocr", "-m", str(model_path.resolve()),
+                ]
+                col_txt.subheader("Transcription")
+                with col_txt:
+                    with st.spinner("Segmentation + reconnaissance en cours…"):
+                        result = subprocess.run(
+                            cmd, capture_output=True, text=True, timeout=300
+                        )
+                    if result.returncode != 0:
+                        st.error(f"Erreur Kraken :\n```\n{result.stderr[-1000:]}\n```")
+                    elif out_txt.exists():
+                        texte = out_txt.read_text(encoding="utf-8").strip()
+                        st.text_area("Résultat", texte, height=400)
+                        st.download_button(
+                            "Télécharger la transcription",
+                            data=texte,
+                            file_name=f"{img_path.stem}_transcription.txt",
+                            mime="text/plain",
+                        )
+                        lignes = [l for l in texte.splitlines() if l.strip()]
+                        st.caption(f"{len(lignes)} ligne(s) transcrite(s)")
+                    else:
+                        st.warning("Kraken n'a produit aucune sortie.")
+    else:
+        st.info("Upload une image ci-dessus pour lancer la transcription.")
 
 
 # ── 5. COMPARAISON ───────────────────────────────────────────────────────────
