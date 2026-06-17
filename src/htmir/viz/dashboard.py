@@ -8,6 +8,8 @@ Lancement :
     streamlit run src/htmir/viz/dashboard.py
 """
 
+import os
+import tempfile
 from pathlib import Path
 
 import altair as alt
@@ -20,15 +22,58 @@ st.set_page_config(page_title="HTmiR — Dashboard", layout="wide", page_icon="�
 
 CER_TARGET = 0.08  # cible projet : CER < 8 %
 
+# ── Téléchargement S3 au démarrage (si les fichiers ne sont pas en local) ────
+S3_BUCKET = "htmir-data"
+S3_PREFIX = "dashboard/catmus-french-13c"
+S3_REGION = "eu-west-3"
+_LOCAL_DATA = Path("data/catmus-french-13c")
+
+
+@st.cache_resource(show_spinner="Chargement des artefacts depuis S3…")
+def _sync_from_s3() -> Path:
+    """Télécharge les artefacts dashboard depuis S3 dans un dossier local."""
+    try:
+        import boto3
+        from botocore import UNSIGNED
+        from botocore.config import Config
+
+        dest = _LOCAL_DATA
+        dest.mkdir(parents=True, exist_ok=True)
+
+        # Credentials : depuis les secrets Streamlit ou les vars d'env AWS
+        kwargs: dict = {"region_name": S3_REGION}
+        key = st.secrets.get("AWS_ACCESS_KEY_ID") or os.environ.get("AWS_ACCESS_KEY_ID")
+        secret = st.secrets.get("AWS_SECRET_ACCESS_KEY") or os.environ.get("AWS_SECRET_ACCESS_KEY")
+        if key and secret:
+            kwargs["aws_access_key_id"] = key
+            kwargs["aws_secret_access_key"] = secret
+
+        s3 = boto3.client("s3", **kwargs)
+        paginator = s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=S3_BUCKET, Prefix=S3_PREFIX):
+            for obj in page.get("Contents", []):
+                key_s3 = obj["Key"]
+                rel = key_s3[len(S3_PREFIX):].lstrip("/")
+                local_file = dest / rel
+                local_file.parent.mkdir(parents=True, exist_ok=True)
+                if not local_file.exists():
+                    s3.download_file(S3_BUCKET, key_s3, str(local_file))
+        return dest
+    except Exception:  # noqa: BLE001
+        return _LOCAL_DATA  # fallback silencieux : fichiers locaux si présents
+
+
+if not _LOCAL_DATA.exists() or not any(_LOCAL_DATA.iterdir()):
+    _sync_from_s3()
 
 # ── Sidebar : chemins des artefacts ──────────────────────────────────────────
 st.sidebar.title("📜 HTmiR")
 st.sidebar.caption("HTR français médiéval — XIIIe siècle (CATMuS)")
 
-data_dir = Path(st.sidebar.text_input("Répertoire données", "data/catmus-french-13c"))
-train_log = Path(st.sidebar.text_input("Log entraînement", "data/catmus-french-13c/train.log"))
-metrics_csv = Path(st.sidebar.text_input("Métriques CSV", "data/catmus-french-13c/training_metrics.csv"))
-eval_report = Path(st.sidebar.text_input("Rapport éval", "data/catmus-french-13c/eval_report.json"))
+data_dir = Path(st.sidebar.text_input("Répertoire données", str(_LOCAL_DATA)))
+train_log = Path(st.sidebar.text_input("Log entraînement", str(_LOCAL_DATA / "train.log")))
+metrics_csv = Path(st.sidebar.text_input("Métriques CSV", str(_LOCAL_DATA / "training_metrics.csv")))
+eval_report = Path(st.sidebar.text_input("Rapport éval", str(_LOCAL_DATA / "eval_report.json")))
 preds_csv = Path(st.sidebar.text_input("Prédictions CSV", "predictions.csv"))
 patience = st.sidebar.number_input("Patience (early-stopping)", 1, 50, 10)
 
