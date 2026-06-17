@@ -45,8 +45,8 @@ def _load_training_rows() -> list[dict]:
     return []
 
 
-tab_overview, tab_data, tab_train, tab_eval, tab_compare, tab_demo = st.tabs(
-    ["Vue d'ensemble", "Dataset", "Entraînement", "Évaluation", "Comparaison", "🔍 Tester le modèle"]
+tab_overview, tab_data, tab_train, tab_eval, tab_demo = st.tabs(
+    ["Vue d'ensemble", "Dataset", "Entraînement", "Évaluation", "🔍 Tester le modèle"]
 )
 
 
@@ -313,19 +313,3 @@ with tab_demo:
         st.info("Upload une image ci-dessus pour lancer la transcription.")
 
 
-# ── 5. COMPARAISON ───────────────────────────────────────────────────────────
-with tab_compare:
-    st.header("Comparaison de modèles")
-    st.caption("Dépose plusieurs rapports d'éval pour comparer baseline vs fine-tuné.")
-    runs_dir = Path(st.text_input("Répertoire des rapports", "runs"))
-    if runs_dir.exists():
-        rows = []
-        for rep in sorted(runs_dir.glob("*.json")):
-            data = dl.load_eval_report(rep)
-            rows.append({"run": rep.stem, "output": data.get("ketos_output", "")[:80]})
-        if rows:
-            st.dataframe(pd.DataFrame(rows), use_container_width=True)
-        else:
-            st.info("Aucun rapport trouvé dans ce répertoire.")
-    else:
-        st.info("Répertoire de comparaison inexistant pour l'instant.")
