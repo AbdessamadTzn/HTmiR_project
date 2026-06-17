@@ -218,7 +218,14 @@ __marimo__/
 .streamlit/secrets.toml
 
 # --- HTmiR : artefacts locaux (datasets, modeles, exports) ---
-data/
+# Données brutes (images + ground truth) — trop lourdes pour git
+data/catmus-french-13c/train/
+data/catmus-french-13c/validation/
+data/catmus-french-13c/test/
+data/catmus-french-13c/*.arrow
+# Dossiers de données hors artefacts dashboard
+data/[!c]*/
+data/c[!a]*/
 _dashboard_export/
 htmir-dashboard-artifacts.zip
 

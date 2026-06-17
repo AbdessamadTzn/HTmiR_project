@@ -1,0 +1,13 @@
+{
+  "repo_id": "CATMuS/medieval",
+  "filter": {
+    "language": "French",
+    "century": 13
+  },
+  "splits": {
+    "train": 19238,
+    "validation": 969,
+    "test": 1369
+  },
+  "total": 21576
+}

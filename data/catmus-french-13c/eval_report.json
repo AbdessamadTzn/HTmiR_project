@@ -1,0 +1,18 @@
+{
+  "model": "htmir-french-13c/best_0.9553.safetensors",
+  "test_set": "C:\\Users\\mopen\\Documents\\GitHub\\Hetic\\HTmiR_project\\data\\catmus-french-13c\\test.arrow",
+  "note": "Evaluation test set via ketos test indisponible (bug Kraken 7 binaire). Metriques validation extraites du train.log.",
+  "validation_best": {
+    "epoch": 4,
+    "val_accuracy": 0.95533,
+    "cer": 0.04467,
+    "val_word_accuracy": 0.724,
+    "wer": 0.276
+  },
+  "training": {
+    "epochs_completed": 7,
+    "early_stopping_patience": 10,
+    "stopped_reason": "early_stopping"
+  },
+  "ketos_output": "Best validation char accuracy: 0.95533"
+}
