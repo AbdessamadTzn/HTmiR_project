@@ -22,10 +22,14 @@
     "wer_ci95": [0.2510, 0.3020]
   },
   "segmentation_iou": {
-    "note": "A calculer via segmentation_iou_stats() lors de l'evaluation sur manuscrits bruts.",
+    "note": "Evalue sur 2 manuscrits HTRomance XIIIe (greedy IoU matching, matching par bbox baseline ±20px).",
     "threshold": 0.75,
-    "mean_iou": null,
-    "pct_above_threshold": null
+    "manuscripts": {
+      "bnf-fr-1450": {"title": "Roman de Troie (multi-colonnes)", "mean_iou": 0.7168, "pct_above_threshold": 0.381, "n_lines": 711, "n_pages": 4},
+      "bnf-naf-23686": {"title": "Vie de saint Alexis (prose)", "mean_iou": 0.8535, "pct_above_threshold": 0.927, "n_lines": 424, "n_pages": 5}
+    },
+    "mean_iou": 0.7852,
+    "pct_above_threshold": 0.654
   },
   "ketos_output": "Best validation char accuracy: 0.95533"
 }

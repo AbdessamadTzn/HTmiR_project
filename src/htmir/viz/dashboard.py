@@ -240,9 +240,27 @@ with tab_eval:
             threshold = iou.get("threshold", 0.75)
             if mean_iou is not None:
                 ic1, ic2 = st.columns(2)
-                ic1.metric("IoU moyen", f"{mean_iou:.2%}")
+                ok_iou = mean_iou >= threshold
+                ic1.metric("IoU moyen (tous manuscrits)", f"{mean_iou:.2%}",
+                           delta="✅ seuil atteint" if ok_iou else f"⚠️ sous seuil {threshold:.0%}")
                 ic2.metric(f"Lignes IoU ≥ {threshold:.0%}",
                            f"{pct:.1%}" if pct is not None else "—")
+                # Détail par manuscrit
+                manuscripts = iou.get("manuscripts", {})
+                if manuscripts:
+                    st.caption("Détail par manuscrit (HTRomance XIIIe siècle)")
+                    rows = []
+                    for ms_id, ms in manuscripts.items():
+                        rows.append({
+                            "Manuscrit": ms.get("title", ms_id),
+                            "IoU moyen": f"{ms['mean_iou']:.2%}",
+                            f"≥ {threshold:.0%}": f"{ms['pct_above_threshold']:.1%}",
+                            "Lignes": ms.get("n_lines", "—"),
+                            "Pages": ms.get("n_pages", "—"),
+                            "Seuil OK": "✅" if ms["mean_iou"] >= threshold else "⚠️",
+                        })
+                    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+                st.caption(iou.get("note", ""))
             else:
                 st.info(iou.get("note", "IoU non calculé — lancer l'évaluation sur manuscrits bruts."))
 
