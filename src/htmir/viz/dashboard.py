@@ -233,10 +233,17 @@ with tab_demo:
         "et transcrit avec le modèle fine-tuné."
     )
 
-    model_path = Path(st.text_input(
-        "Chemin du modèle",
-        "htmir-french-13c_best.safetensors",
-    ))
+    HF_REPO = "abdessamadtouzani/htmir-french-13c"
+    HF_FILE = "htmir-french-13c_best.safetensors"
+
+    @st.cache_resource(show_spinner="Téléchargement du modèle depuis HuggingFace…")
+    def _download_hf_model(repo: str, filename: str) -> str:
+        """Télécharge (et met en cache) le modèle Kraken depuis HuggingFace."""
+        from huggingface_hub import hf_hub_download
+
+        return hf_hub_download(repo_id=repo, filename=filename)
+
+    st.caption(f"Modèle : `{HF_REPO}` (chargé directement depuis HuggingFace)")
 
     uploaded = st.file_uploader("Image manuscrit", type=["png", "jpg", "jpeg", "tif", "tiff"])
 
@@ -250,6 +257,14 @@ with tab_demo:
             col_img.subheader("Image")
             col_img.image(str(img_path), use_container_width=True)
 
+            # Modèle : téléchargé (et mis en cache) directement depuis HuggingFace.
+            model_path = None
+            model_error = None
+            try:
+                model_path = Path(_download_hf_model(HF_REPO, HF_FILE))
+            except Exception as exc:  # noqa: BLE001
+                model_error = str(exc)
+
             # Priorité au kraken HTR du venv (évite le kraken bio-informatique apt)
             venv_kraken = Path(__file__).resolve().parents[3] / ".venv/bin/kraken"
             kraken_bin = str(venv_kraken) if venv_kraken.exists() else shutil.which("kraken")
@@ -257,10 +272,11 @@ with tab_demo:
                 col_txt.error(
                     "Kraken introuvable. Installe-le avec :\n```\npip install kraken\n```"
                 )
-            elif not model_path.exists():
+            elif model_path is None or not model_path.exists():
                 col_txt.error(
-                    f"Modèle introuvable : `{model_path}`\n\n"
-                    "Place `htmir-french-13c_best.safetensors` à la racine du projet."
+                    "Modèle indisponible.\n\n"
+                    f"Échec du chargement depuis `{HF_REPO}` "
+                    f"({model_error or 'fichier introuvable'})."
                 )
             else:
                 out_txt = tmp / "output.txt"
