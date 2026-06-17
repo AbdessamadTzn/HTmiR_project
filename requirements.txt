@@ -1,0 +1,7 @@
+streamlit>=1.35
+pandas>=2.0
+altair>=5.0
+huggingface_hub>=0.23
+duckdb>=1.0.0
+pillow>=10.3.0
+pyyaml>=6.0
