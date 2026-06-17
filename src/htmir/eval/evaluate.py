@@ -107,6 +107,105 @@ def corpus_metrics(pairs: list[tuple[str, str]]) -> dict:
     }
 
 
+def bootstrap_ci(
+    pairs: list[tuple[str, str]],
+    n_bootstrap: int = 1000,
+    alpha: float = 0.05,
+    seed: int = 42,
+) -> dict:
+    """Intervalles de confiance bootstrap (rééchantillonnage) pour CER et WER.
+
+    Args:
+        pairs: Couples ``(référence, hypothèse)`` du test set.
+        n_bootstrap: Nombre de répétitions (1000 recommandé).
+        alpha: Niveau de signification (0.05 → IC à 95 %).
+        seed: Graine pour la reproductibilité.
+
+    Returns:
+        ``{n_bootstrap, alpha, cer_ci95, wer_ci95}`` — les CI sont des listes
+        ``[borne_inf, borne_sup]``.
+    """
+    import random
+
+    rng = random.Random(seed)
+    n = len(pairs)
+    if n == 0:
+        return {}
+
+    cer_samples: list[float] = []
+    wer_samples: list[float] = []
+    for _ in range(n_bootstrap):
+        sample = [pairs[rng.randint(0, n - 1)] for _ in range(n)]
+        m = corpus_metrics(sample)
+        cer_samples.append(m["cer"])
+        wer_samples.append(m["wer"])
+
+    cer_samples.sort()
+    wer_samples.sort()
+    lo = int(alpha / 2 * n_bootstrap)
+    hi = int((1 - alpha / 2) * n_bootstrap) - 1
+
+    return {
+        "n_bootstrap": n_bootstrap,
+        "alpha": alpha,
+        "cer_ci95": [round(cer_samples[lo], 6), round(cer_samples[hi], 6)],
+        "wer_ci95": [round(wer_samples[lo], 6), round(wer_samples[hi], 6)],
+    }
+
+
+def polygon_iou(poly_a: list[list[float]], poly_b: list[list[float]]) -> float:
+    """IoU approximatif entre deux polygones via leurs bounding boxes.
+
+    Args:
+        poly_a: Liste de points ``[[x, y], ...]``.
+        poly_b: Liste de points ``[[x, y], ...]``.
+
+    Returns:
+        Score IoU dans ``[0, 1]``.
+    """
+    def bbox(poly: list[list[float]]) -> tuple[float, float, float, float]:
+        xs = [p[0] for p in poly]
+        ys = [p[1] for p in poly]
+        return min(xs), min(ys), max(xs), max(ys)
+
+    ax1, ay1, ax2, ay2 = bbox(poly_a)
+    bx1, by1, bx2, by2 = bbox(poly_b)
+    ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+    ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+    if ix2 <= ix1 or iy2 <= iy1:
+        return 0.0
+    inter = (ix2 - ix1) * (iy2 - iy1)
+    union = (ax2 - ax1) * (ay2 - ay1) + (bx2 - bx1) * (by2 - by1) - inter
+    return inter / union if union > 0 else 0.0
+
+
+def segmentation_iou_stats(
+    pred_polys: list[list[list[float]]],
+    gt_polys: list[list[list[float]]],
+    threshold: float = 0.75,
+) -> dict:
+    """Statistiques IoU de segmentation (lignes prédites vs vérité terrain).
+
+    Args:
+        pred_polys: Polygones prédits par le segmenteur (une liste par ligne).
+        gt_polys: Polygones de référence.
+        threshold: Seuil IoU (0.75 = critère projet).
+
+    Returns:
+        ``{mean_iou, pct_above_threshold, threshold, n_lines}``.
+    """
+    n = min(len(pred_polys), len(gt_polys))
+    if n == 0:
+        return {}
+    ious = [polygon_iou(pred_polys[i], gt_polys[i]) for i in range(n)]
+    return {
+        "mean_iou": round(sum(ious) / n, 4),
+        "pct_above_threshold": round(sum(1 for v in ious if v >= threshold) / n, 4),
+        "threshold": threshold,
+        "n_lines": n,
+    }
+
+
 def build_ketos_test_cmd(model: Path, test_arrow: Path, device: str = "cpu") -> list[str]:
     """Construit la commande ``ketos test`` pour évaluer un modèle.
 

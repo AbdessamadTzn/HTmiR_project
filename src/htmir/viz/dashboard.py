@@ -195,32 +195,73 @@ with tab_eval:
     report = dl.load_eval_report(eval_report)
     preds = dl.load_predictions(preds_csv)
 
-    if report:
-        st.subheader("Sortie ketos test")
-        st.code(report.get("ketos_output", ""), language=None)
-    else:
+    if not report:
         st.info("Pas encore de rapport d'évaluation.")
-
-    if preds:
-        from htmir.eval.evaluate import corpus_metrics
-        pairs = [(p.get("ref", ""), p.get("hyp", "")) for p in preds]
-        m = corpus_metrics(pairs)
-        c1, c2, c3 = st.columns(3)
-        c1.metric("CER (test)", f"{m['cer']:.1%}")
-        c2.metric("WER (test)", f"{m['wer']:.1%}")
-        c3.metric("Lignes", m["n_lines"])
-
-        st.subheader("Pires prédictions (diagnostic)")
-        for w in dl.worst_predictions(preds, n=10):
-            if w.get("image_path") and Path(w["image_path"]).exists():
-                st.image(w["image_path"], use_container_width=True)
-            st.markdown(
-                f"**CER {w['cer']:.0%}** — réf : `{w.get('ref','')}` → "
-                f"préd : `{w.get('hyp','')}`"
-            )
-            st.divider()
     else:
-        st.caption("Fournis un CSV de prédictions (ref,hyp,image_path) pour le diagnostic.")
+        val = report.get("validation_best", {})
+        cer = val.get("cer")
+        wer = val.get("wer")
+
+        # ── Métriques principales ─────────────────────────────────────────
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("CER", f"{cer:.2%}" if cer is not None else "—")
+        c2.metric("WER", f"{wer:.2%}" if wer is not None else "—")
+        c3.metric("Epoch", val.get("epoch", "—"))
+        c4.metric("Accuracy char", f"{val.get('val_accuracy', 0):.2%}" if val.get("val_accuracy") else "—")
+
+        # ── Bootstrap CI ──────────────────────────────────────────────────
+        boot = report.get("bootstrap", {})
+        if boot and boot.get("cer_ci95"):
+            st.subheader("Intervalles de confiance bootstrap")
+            cer_lo, cer_hi = boot["cer_ci95"]
+            wer_lo, wer_hi = boot["wer_ci95"]
+            bc1, bc2 = st.columns(2)
+            with bc1:
+                st.markdown(f"**CER IC 95 %** : `{cer_lo:.2%}` — `{cer_hi:.2%}`")
+                width_cer = cer_hi - cer_lo
+                st.progress(min(1.0, cer if cer else 0.0),
+                            text=f"CER {cer:.2%} (±{width_cer/2:.2%})")
+            with bc2:
+                st.markdown(f"**WER IC 95 %** : `{wer_lo:.2%}` — `{wer_hi:.2%}`")
+                width_wer = wer_hi - wer_lo
+                st.progress(min(1.0, wer if wer else 0.0),
+                            text=f"WER {wer:.2%} (±{width_wer/2:.2%})")
+            st.caption(
+                f"Bootstrap N={boot.get('n_bootstrap', 1000)}, α={boot.get('alpha', 0.05)} "
+                f"— {boot.get('note', '')}"
+            )
+
+        # ── IoU segmentation ─────────────────────────────────────────────
+        iou = report.get("segmentation_iou", {})
+        if iou:
+            st.subheader("IoU segmentation")
+            mean_iou = iou.get("mean_iou")
+            pct = iou.get("pct_above_threshold")
+            threshold = iou.get("threshold", 0.75)
+            if mean_iou is not None:
+                ic1, ic2 = st.columns(2)
+                ic1.metric("IoU moyen", f"{mean_iou:.2%}")
+                ic2.metric(f"Lignes IoU ≥ {threshold:.0%}",
+                           f"{pct:.1%}" if pct is not None else "—")
+            else:
+                st.info(iou.get("note", "IoU non calculé — lancer l'évaluation sur manuscrits bruts."))
+
+        # ── Pires prédictions ─────────────────────────────────────────────
+        if preds:
+            from htmir.eval.evaluate import corpus_metrics
+            pairs = [(p.get("ref", ""), p.get("hyp", "")) for p in preds]
+            m = corpus_metrics(pairs)
+            st.subheader(f"Pires prédictions (diagnostic) — {m['n_lines']} lignes")
+            for w in dl.worst_predictions(preds, n=10):
+                if w.get("image_path") and Path(w["image_path"]).exists():
+                    st.image(w["image_path"], use_container_width=True)
+                st.markdown(
+                    f"**CER {w['cer']:.0%}** — réf : `{w.get('ref','')}` → "
+                    f"préd : `{w.get('hyp','')}`"
+                )
+                st.divider()
+        else:
+            st.caption("Fournis un CSV de prédictions (ref,hyp,image_path) pour le diagnostic ligne par ligne.")
 
 
 # ── 6. DÉMO OCR ──────────────────────────────────────────────────────────────
