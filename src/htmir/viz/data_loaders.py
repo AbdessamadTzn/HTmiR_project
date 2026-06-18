@@ -13,7 +13,39 @@ renvoient des structures simples — donc entièrement testables :
 
 import json
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
+
+
+def text_from_alto(alto_xml: str) -> str:
+    """Extrait le texte ligne par ligne d'un ALTO XML produit par Kraken.
+
+    Chaque ``TextLine`` regroupe un ou plusieurs ``String`` (mots)~; on les
+    joint par une espace, une ligne par ``TextLine``.
+
+    Args:
+        alto_xml: Contenu ALTO XML (chaîne).
+
+    Returns:
+        Le texte reconstitué (lignes séparées par ``\\n``), ou ``""`` si le XML
+        est invalide ou vide.
+    """
+    try:
+        root = ET.fromstring(alto_xml)
+    except ET.ParseError:
+        return ""
+    lines: list[str] = []
+    for line in root.iter():
+        if line.tag.split("}")[-1] != "TextLine":
+            continue
+        words = [
+            el.attrib["CONTENT"]
+            for el in line.iter()
+            if el.tag.split("}")[-1] == "String" and el.attrib.get("CONTENT")
+        ]
+        if words:
+            lines.append(" ".join(words))
+    return "\n".join(lines)
 
 
 def load_dataset_manifest(path: Path) -> dict:

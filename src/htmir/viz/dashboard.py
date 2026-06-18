@@ -340,10 +340,11 @@ with tab_demo:
                     f"({model_error or 'fichier introuvable'})."
                 )
             else:
-                out_txt = tmp / "output.txt"
+                # Sortie ALTO XML (coordonnées + texte) — format du corpus HTRomance.
+                out_xml = tmp / "output.xml"
                 cmd = [
-                    kraken_bin,
-                    "-i", str(img_path), str(out_txt),
+                    kraken_bin, "-a",  # -a : sérialisation ALTO XML
+                    "-i", str(img_path), str(out_xml),
                     "segment", "-bl",
                     "ocr", "-m", str(model_path.resolve()),
                 ]
@@ -355,17 +356,25 @@ with tab_demo:
                         )
                     if result.returncode != 0:
                         st.error(f"Erreur Kraken :\n```\n{result.stderr[-1000:]}\n```")
-                    elif out_txt.exists():
-                        texte = out_txt.read_text(encoding="utf-8").strip()
-                        st.text_area("Résultat", texte, height=400)
-                        st.download_button(
-                            "Télécharger la transcription",
-                            data=texte,
-                            file_name=f"{img_path.stem}_transcription.txt",
-                            mime="text/plain",
-                        )
+                    elif out_xml.exists():
+                        alto = out_xml.read_text(encoding="utf-8")
+                        texte = dl.text_from_alto(alto)
+                        st.text_area("Résultat", texte, height=350)
                         lignes = [l for l in texte.splitlines() if l.strip()]
                         st.caption(f"{len(lignes)} ligne(s) transcrite(s)")
+                        dc1, dc2 = st.columns(2)
+                        dc1.download_button(
+                            "⬇️ ALTO XML",
+                            data=alto,
+                            file_name=f"{img_path.stem}.xml",
+                            mime="application/xml",
+                        )
+                        dc2.download_button(
+                            "⬇️ Texte brut",
+                            data=texte,
+                            file_name=f"{img_path.stem}.txt",
+                            mime="text/plain",
+                        )
                     else:
                         st.warning("Kraken n'a produit aucune sortie.")
     else:

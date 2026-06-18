@@ -188,3 +188,31 @@ def test_load_predictions_csv(tmp_path):
     rows = dl.load_predictions(p)
     assert rows[0]["ref"] == "li rois"
     assert rows[0]["hyp"] == "li reis"
+
+
+# ── text_from_alto ──────────────────────────────────────────────────────────
+
+
+def test_text_from_alto_basic():
+    """Reconstitue le texte ligne par ligne depuis un ALTO Kraken."""
+    ns = "http://www.loc.gov/standards/alto/ns-v4#"
+    alto = f"""<?xml version="1.0"?>
+<alto xmlns="{ns}">
+  <Layout><Page><PrintSpace>
+    <TextLine><String CONTENT="li"/><String CONTENT="rois"/></TextLine>
+    <TextLine><String CONTENT="de"/><String CONTENT="France"/></TextLine>
+  </PrintSpace></Page></Layout>
+</alto>"""
+    assert dl.text_from_alto(alto) == "li rois\nde France"
+
+
+def test_text_from_alto_invalid():
+    assert dl.text_from_alto("pas du xml") == ""
+
+
+def test_text_from_alto_empty_lines():
+    ns = "http://www.loc.gov/standards/alto/ns-v4#"
+    alto = f'<alto xmlns="{ns}"><Layout><Page><PrintSpace>' \
+           '<TextLine><String CONTENT=""/></TextLine>' \
+           '</PrintSpace></Page></Layout></alto>'
+    assert dl.text_from_alto(alto) == ""
