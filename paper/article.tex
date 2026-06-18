@@ -38,8 +38,13 @@ pipeline HTR reproductible sur le \emph{français médiéval du
 XIII\textsuperscript{e} siècle}, à partir du corpus CATMuS Medieval. Nous
 fine-tunons le modèle Kraken \textit{CATMuS Medieval} sur près de 21\,000 lignes
 filtrées et obtenons un taux d'erreur caractère (CER) de validation d'environ
-\textbf{4,5\,\%}, sous notre cible de 8\,\%. Cet article décrit la collecte des
-données, la méthode de fine-tuning, les résultats, et les perspectives
+\textbf{4,5\,\%} (intervalle de confiance bootstrap à 95\,\%~:
+$[3,7\,\%;\,5,3\,\%]$), sous notre cible de 8\,\%. Nous évaluons en outre la
+\emph{segmentation} de pages complètes sur un corpus indépendant (HTRomance,
+manuscrits français du XIII\textsuperscript{e} siècle) et mesurons un IoU moyen
+de \textbf{78,5\,\%}, atteignant le seuil de 0,75 sur les manuscrits à colonne
+unique. Cet article décrit la collecte des données, la méthode de fine-tuning,
+l'évaluation (reconnaissance et segmentation), et les perspectives
 d'application à l'écriture de Léonard de Vinci.
 \end{abstract}
 
@@ -75,9 +80,12 @@ fine-tuning sur les carnets de Léonard de Vinci.
 
 \textbf{Contributions.} (i)~Un pipeline reproductible de collecte et de
 préparation de données HTR depuis CATMuS Medieval~; (ii)~le fine-tuning d'un
-modèle Kraken atteignant un CER de validation d'environ 4,5\,\%~;
-(iii)~un tableau de bord de visualisation des résultats~; (iv)~une discussion
-des perspectives vers l'écriture spéculaire de Léonard de Vinci.
+modèle Kraken atteignant un CER de validation d'environ 4,5\,\%, assorti
+d'intervalles de confiance par \textit{bootstrap}~; (iii)~une évaluation de la
+segmentation de pages (métrique IoU) sur un corpus indépendant de manuscrits
+français du XIII\textsuperscript{e} siècle (HTRomance)~; (iv)~un tableau de bord
+de visualisation des résultats~; (v)~une discussion des perspectives vers
+l'écriture spéculaire de Léonard de Vinci.
 
 % ─────────────────────────────────────────────────────────────────
 \section{Contexte et travaux liés}
@@ -129,6 +137,19 @@ entraînement, $\sim$970 en validation, $\sim$1\,370 en test). Les transcription
 préservent les abréviations médiévales (p.\,ex. \textit{\&} tironien, voyelles
 nasalisées), couvrant un alphabet de 252 symboles.
 
+\subsection{Corpus d'évaluation de la segmentation}
+CATMuS fournissant des \emph{lignes} déjà découpées, il ne permet pas d'évaluer
+la segmentation de \emph{pages}. Pour cela nous mobilisons un corpus
+\emph{indépendant}~: HTRomance~\cite{htromance}, qui distribue des pages
+complètes de manuscrits français médiévaux avec leurs \textit{baselines} de
+référence au format ALTO~XML. Nous retenons deux manuscrits du
+XIII\textsuperscript{e} siècle aux mises en page contrastées~: \textit{BnF,
+fr.~1450} (\textit{Roman de Troie}, double colonne, 711~lignes sur 4~folios) et
+\textit{BnF, NAF~23686} (\textit{Vie de saint Alexis}, prose en colonne unique,
+424~lignes sur 5~folios). Ce corpus n'intervient \emph{pas} dans
+l'entraînement~: il sert exclusivement à l'évaluation indépendante du
+segmenteur.
+
 % ─────────────────────────────────────────────────────────────────
 \section{Méthode}
 
@@ -171,7 +192,29 @@ WER (\textit{Word Error Rate}), fondés sur la distance d'édition de Levenshtei
 {\text{nombre de caractères de référence}}.
 \end{equation}
 Le CER est notre métrique principale, avec une cible $\mathrm{CER} < 8\,\%$,
-seuil usuel d'exploitabilité pour le médiéval.
+seuil usuel d'exploitabilité pour le médiéval. Le CER (resp. WER) est calculé en
+\emph{micro-moyenne} (somme des distances divisée par la somme des longueurs de
+référence), plus représentative qu'une moyenne par ligne.
+
+\subsection{Intervalles de confiance par bootstrap}
+Pour quantifier l'incertitude d'échantillonnage des métriques, nous estimons
+des intervalles de confiance à 95\,\% par \textit{bootstrap}
+non-paramétrique~\cite{efron}~: à partir de l'ensemble d'évaluation de $n$
+lignes, nous tirons $N=1000$ ré-échantillons avec remise (de taille $n$),
+recalculons le CER et le WER sur chacun, et retenons les percentiles 2,5 et 97,5
+des distributions obtenues. Le tirage est ensemencé (\textit{seed} fixe) pour la
+reproductibilité.
+
+\subsection{Évaluation de la segmentation (IoU)}
+La qualité de la segmentation de page est mesurée par l'\textit{Intersection
+over Union} (IoU) entre lignes prédites et lignes de référence. Chaque
+\textit{baseline} (prédite par \texttt{kraken segment}, ou de référence dans
+l'ALTO HTRomance) est convertie en boîte englobante (marge verticale de
+$\pm20$~px). Les lignes prédites et de référence sont appariées par un algorithme
+\emph{glouton} maximisant l'IoU~: chaque ligne de référence est associée à la
+prédiction disponible de plus fort recouvrement~; les lignes de référence sans
+correspondance comptent pour un IoU nul. Nous rapportons l'IoU moyen et la
+proportion de lignes dont l'IoU dépasse le seuil de 0,75.
 
 \subsection{Reproductibilité}
 L'ensemble du pipeline (préparation, entraînement, évaluation) est piloté par
@@ -202,17 +245,65 @@ pointillée indique la cible de 8\,\%~; le point vert marque le meilleur epoch.}
 \label{fig:acc}
 \end{figure}
 
-\textbf{Validation qualitative.} Appliqué à une page complète de manuscrit
-français (segmentation \textit{baseline} Kraken puis reconnaissance), le modèle
-segmente et transcrit les lignes de texte gothique, illustrant l'enchaînement
-segmentation~$\rightarrow$~reconnaissance du pipeline.
+\subsection{Robustesse statistique}
+L'analyse par \textit{bootstrap} ($N=1000$) confirme la stabilité des métriques~:
+le CER se situe dans l'intervalle de confiance à 95\,\% $[3,7\,\%;\,5,3\,\%]$ et
+le WER dans $[25,1\,\%;\,30,2\,\%]$ (figure~\ref{fig:boot}). La borne supérieure
+du CER reste nettement sous la cible de 8\,\%, ce qui conforte l'exploitabilité
+du modèle.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{figures/bootstrap_ci.pdf}
+\caption{Intervalles de confiance à 95\,\% du CER et du WER, estimés par
+\textit{bootstrap} ($N=1000$). Le point marque l'estimation ponctuelle, les
+barres les bornes de l'intervalle.}
+\label{fig:boot}
+\end{figure}
+
+\subsection{Segmentation de pages}
+Sur le corpus indépendant HTRomance, le segmenteur Kraken atteint un IoU moyen de
+\textbf{78,5\,\%} (tableau~\ref{tab:iou}, figure~\ref{fig:iou}). Le résultat
+dépend fortement de la mise en page~: sur le manuscrit en \emph{prose à colonne
+unique} (\textit{Vie de saint Alexis}), l'IoU moyen atteint 85,4\,\% et 92,7\,\%
+des lignes dépassent le seuil de 0,75~; sur le manuscrit en \emph{double colonne}
+(\textit{Roman de Troie}), l'IoU moyen retombe à 71,7\,\% car le découpage en
+colonnes des références ALTO ne coïncide pas toujours avec les lignes détectées
+par Kraken.
+
+\begin{table}[!t]
+\centering
+\caption{Évaluation de la segmentation (IoU) sur HTRomance, XIII\textsuperscript{e}~s.}
+\label{tab:iou}
+\begin{tabular}{lccc}
+\toprule
+Manuscrit & IoU moyen & Lignes $\geq 0{,}75$ & Lignes \\
+\midrule
+\textit{Vie de saint Alexis} (prose) & 85,4\,\% & 92,7\,\% & 424 \\
+\textit{Roman de Troie} (2~col.)     & 71,7\,\% & 38,1\,\% & 711 \\
+\midrule
+\textbf{Moyenne}                     & \textbf{78,5\,\%} & 65,4\,\% & 1\,135 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{figures/iou_segmentation.pdf}
+\caption{IoU moyen et proportion de lignes au-dessus du seuil de 0,75, par
+manuscrit. La ligne pointillée marque le seuil cible.}
+\label{fig:iou}
+\end{figure}
 
 % ─────────────────────────────────────────────────────────────────
 \section{Discussion et limites}
-\textbf{Segmentation.} Le travail porte sur la \emph{reconnaissance} de lignes
-pré-segmentées (fournies par CATMuS). L'évaluation d'un segmenteur de page (et la
-métrique IoU associée) constitue une extension naturelle, réalisable sans
-ré-entraînement du modèle de reconnaissance.
+\textbf{Segmentation et mise en page.} L'évaluation IoU montre que le segmenteur
+Kraken est performant sur les manuscrits à colonne unique mais se dégrade sur les
+mises en page à colonnes multiples, où la granularité des références ALTO diffère
+de celle des lignes détectées. Une harmonisation des conventions d'annotation
+(ligne intra-colonne) ou un appariement tenant compte des régions de texte
+améliorerait vraisemblablement la mesure. Notons que ce volet est évalué sur un
+corpus \emph{indépendant} de l'entraînement, ce qui en renforce la validité.
 
 \textbf{Évaluation sur le test.} L'évaluation automatisée sur le \textit{test
 set} via \texttt{ketos test} s'est heurtée à une incompatibilité de Kraken~7
@@ -233,8 +324,12 @@ validation d'environ 4,5\,\%. Ce résultat valide la chaîne complète --- colle
 préparation, fine-tuning, évaluation, visualisation --- et fournit une base
 solide pour l'objectif initial.
 
-Les prochaines étapes sont~: (i)~l'ajout d'un volet \emph{segmentation} avec
-métrique IoU~; (ii)~une évaluation \textit{test} robuste~; (iii)~la constitution
+Au-delà de la reconnaissance (CER $\approx 4,5\,\%$) et de la segmentation
+(IoU $\approx 78,5\,\%$) ici validées, les prochaines étapes sont~: (i)~une
+évaluation \textit{test} robuste sur le jeu scellé~; (ii)~un appariement de
+segmentation sensible aux régions pour les mises en page complexes~; (iii)~un
+volet de \emph{post-traitement linguistique} (normalisation, correction
+lexicale du français ancien) en aval de la reconnaissance~; (iv)~la constitution
 progressive d'une vérité terrain pour les carnets de Léonard de Vinci
 (retournement des images spéculaires, annotation assistée, puis fine-tuning du
 présent modèle comme point de départ). À terme, le modèle pourrait transcrire
@@ -254,6 +349,12 @@ for the humanities}, Digital Humanities, 2019.
 multilingual large-scale cross-century dataset in Latin script for HTR}, 2024.
 \bibitem{ctc} A.~Graves \textit{et al.}, \textit{Connectionist Temporal
 Classification}, ICML, 2006.
+\bibitem{htromance} A.~Pinche, J.-B.~Camps, T.~Clérice \textit{et al.},
+\textit{HTRomance: Medieval French corpus of ground-truth for Handwritten Text
+Recognition and Layout Segmentation}, HTR-United / Journal for Open Humanities
+Data, 2023.
+\bibitem{efron} B.~Efron and R.~Tibshirani, \textit{An Introduction to the
+Bootstrap}, Chapman \& Hall, 1993.
 \end{thebibliography}
 
 \end{document}

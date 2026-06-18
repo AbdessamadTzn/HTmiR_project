@@ -5,16 +5,17 @@ Article en français (LaTeX) — construit **progressivement** au fil du projet.
 ## Fichiers
 
 - `article.tex` — l'article (Abstract → Conclusion)
-- `make_figures.py` — génère les figures depuis les vraies métriques d'entraînement
-- `figures/` — graphiques générés (CER et accuracy par epoch)
+- `make_figures.py` — génère les figures depuis les vraies métriques d'entraînement + le rapport d'éval
+- `figures/` — graphiques générés (CER, accuracy, bootstrap CI, IoU segmentation)
 
 ## Régénérer les figures
 
 ```bash
 python paper/make_figures.py
 ```
-Lit `data/catmus-french-13c/training_metrics.csv` et écrit les `.pdf`/`.png`
-dans `figures/`.
+Lit `data/catmus-french-13c/training_metrics.csv` (entraînement) et
+`data/catmus-french-13c/eval_report.json` (bootstrap CI + IoU), puis écrit les
+`.pdf`/`.png` dans `figures/`.
 
 ## Format
 
@@ -38,9 +39,11 @@ pdflatex article.tex
 | Section | Statut |
 |---|---|
 | Introduction (da Vinci → pivot) | ✅ rédigée |
-| Données (CATMuS français XIIIe) | ✅ rédigée |
-| Méthode (fine-tuning Kraken) | ✅ rédigée |
+| Données (CATMuS français XIIIe + HTRomance) | ✅ rédigée |
+| Méthode (fine-tuning + bootstrap + IoU) | ✅ rédigée |
 | Résultats (CER ~4,5 %, figures) | ✅ rédigée |
-| Segmentation + IoU | 🔲 à ajouter |
-| Évaluation test set | 🔲 à finaliser |
+| Robustesse statistique (bootstrap CI) | ✅ rédigée |
+| Segmentation + IoU (HTRomance XIIIe) | ✅ rédigée |
+| Évaluation test set | 🔲 à finaliser (bug ketos test Kraken 7) |
 | Application Léonard de Vinci | 🔲 perspective |
+| Post-traitement NLP | 🔲 prochaine partie |

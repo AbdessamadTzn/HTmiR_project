@@ -1,13 +1,15 @@
 """Génère les figures de l'article scientifique depuis les métriques réelles.
 
-Lit ``data/catmus-french-13c/training_metrics.csv`` (produit par l'entraînement)
-et écrit les graphiques dans ``paper/figures/``.
+Lit ``data/catmus-french-13c/training_metrics.csv`` (entraînement) et
+``data/catmus-french-13c/eval_report.json`` (bootstrap CI + IoU segmentation),
+puis écrit les graphiques dans ``paper/figures/``.
 
 Usage :
     python paper/make_figures.py
 """
 
 import csv
+import json
 from pathlib import Path
 
 import matplotlib
@@ -17,8 +19,10 @@ import matplotlib.pyplot as plt  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 METRICS = ROOT / "data/catmus-french-13c/training_metrics.csv"
+EVAL_REPORT = ROOT / "data/catmus-french-13c/eval_report.json"
 OUT = ROOT / "paper/figures"
 CER_TARGET = 0.08
+IOU_TARGET = 0.75
 
 
 def load_metrics(path: Path) -> list[dict]:
@@ -72,6 +76,85 @@ def fig_accuracy(rows: list[dict]) -> None:
     plt.close(fig)
 
 
+def fig_bootstrap_ci(report: dict) -> None:
+    """Forest plot des intervalles de confiance bootstrap (CER et WER)."""
+    boot = report.get("bootstrap", {})
+    val = report.get("validation_best", {})
+    if not boot or not boot.get("cer_ci95"):
+        return
+
+    cer, wer = val.get("cer", 0.0), val.get("wer", 0.0)
+    cer_lo, cer_hi = boot["cer_ci95"]
+    wer_lo, wer_hi = boot["wer_ci95"]
+
+    fig, ax = plt.subplots(figsize=(6, 2.6))
+    metrics = [
+        ("WER", wer, wer_lo, wer_hi, "#d2691e"),
+        ("CER", cer, cer_lo, cer_hi, "#1f4e79"),
+    ]
+    for y, (name, point, lo, hi, color) in enumerate(metrics):
+        ax.plot([lo, hi], [y, y], color=color, lw=2.5, solid_capstyle="round")
+        ax.plot([lo, lo], [y - 0.1, y + 0.1], color=color, lw=2.5)
+        ax.plot([hi, hi], [y - 0.1, y + 0.1], color=color, lw=2.5)
+        ax.scatter([point], [y], color=color, s=110, zorder=5)
+        ax.annotate(f"{point:.1%}  [{lo:.1%}, {hi:.1%}]",
+                    (hi, y), xytext=(8, 0), textcoords="offset points",
+                    va="center", fontsize=8.5)
+
+    ax.set_yticks([0, 1])
+    ax.set_yticklabels(["WER", "CER"])
+    ax.set_ylim(-0.6, 1.6)
+    ax.set_xlim(0, max(wer_hi * 1.45, 0.05))
+    ax.set_xlabel("Taux d'erreur")
+    ax.set_title(f"Intervalles de confiance bootstrap à 95% (N={boot.get('n_bootstrap', 1000)})")
+    ax.grid(True, axis="x", alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(OUT / "bootstrap_ci.pdf")
+    fig.savefig(OUT / "bootstrap_ci.png", dpi=150)
+    plt.close(fig)
+
+
+def fig_iou_segmentation(report: dict) -> None:
+    """Barres IoU moyen + % lignes ≥ seuil par manuscrit d'évaluation."""
+    seg = report.get("segmentation_iou", {})
+    manuscripts = seg.get("manuscripts", {})
+    if not manuscripts:
+        return
+
+    labels, mean_ious, pcts = [], [], []
+    for ms in manuscripts.values():
+        labels.append(ms.get("title", "?").split("(")[0].strip())
+        mean_ious.append(ms["mean_iou"])
+        pcts.append(ms["pct_above_threshold"])
+
+    x = range(len(labels))
+    width = 0.38
+    fig, ax = plt.subplots(figsize=(6, 3.6))
+    ax.bar([i - width / 2 for i in x], mean_ious, width,
+           color="#1f4e79", label="IoU moyen")
+    ax.bar([i + width / 2 for i in x], pcts, width,
+           color="#2e8b57", label=f"Lignes IoU $\\geq$ {IOU_TARGET:.0%}")
+    ax.axhline(IOU_TARGET, ls="--", color="#c00000",
+               label=f"Seuil ({IOU_TARGET:.0%})")
+
+    for i, v in enumerate(mean_ious):
+        ax.text(i - width / 2, v + 0.015, f"{v:.0%}", ha="center", fontsize=8)
+    for i, v in enumerate(pcts):
+        ax.text(i + width / 2, v + 0.015, f"{v:.0%}", ha="center", fontsize=8)
+
+    ax.set_xticks(list(x))
+    ax.set_xticklabels(labels, fontsize=8.5)
+    ax.set_ylabel("Score")
+    ax.set_ylim(0, 1.05)
+    ax.set_title("Segmentation Kraken : IoU sur manuscrits HTRomance (XIIIe s.)")
+    ax.grid(True, axis="y", alpha=0.3)
+    ax.legend(fontsize=8, loc="lower right")
+    fig.tight_layout()
+    fig.savefig(OUT / "iou_segmentation.pdf")
+    fig.savefig(OUT / "iou_segmentation.png", dpi=150)
+    plt.close(fig)
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     if not METRICS.exists():
@@ -79,7 +162,14 @@ def main() -> None:
     rows = load_metrics(METRICS)
     fig_cer(rows)
     fig_accuracy(rows)
-    print(f"Figures générées dans {OUT} ({len(rows)} epochs)")
+
+    n_extra = 0
+    if EVAL_REPORT.exists():
+        report = json.loads(EVAL_REPORT.read_text(encoding="utf-8"))
+        fig_bootstrap_ci(report)
+        fig_iou_segmentation(report)
+        n_extra = 2
+    print(f"Figures générées dans {OUT} ({len(rows)} epochs, {2 + n_extra} graphiques)")
 
 
 if __name__ == "__main__":
