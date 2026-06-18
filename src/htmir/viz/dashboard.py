@@ -393,12 +393,22 @@ with tab_nlp:
     )
 
     def _database_url() -> str | None:
+        # 1. Secrets Streamlit (prod déployée)
         try:
             if "DATABASE_URL" in st.secrets:
                 return st.secrets["DATABASE_URL"]
         except Exception:  # noqa: BLE001
             pass
-        return os.environ.get("DATABASE_URL")
+        # 2. Variable d'environnement
+        if os.environ.get("DATABASE_URL"):
+            return os.environ["DATABASE_URL"]
+        # 3. Fichier .env à la racine (dev local, non versionné)
+        env_path = Path(__file__).resolve().parents[3] / ".env"
+        if env_path.exists():
+            for line in env_path.read_text(encoding="utf-8").splitlines():
+                if line.startswith("DATABASE_URL="):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+        return None
 
     @st.cache_data(ttl=60, show_spinner="Lecture des runs Supabase…")
     def _load_runs(url: str) -> list[dict]:
