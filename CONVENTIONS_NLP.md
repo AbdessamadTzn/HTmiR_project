@@ -62,7 +62,28 @@ Pour un corpus *sans* GT (ex. Léonard de Vinci), on basculerait sur une
 **évaluation relative** (distance entre versions successives, cf. outil
 Evaluation-HTR).
 
-## 5. Reproductibilité
+## 5. Correction guidée (lexique + modèle de langue, sans entraînement)
+
+[lexicon.py](src/htmir/nlp/lexicon.py) + [correction.py](src/htmir/nlp/correction.py).
+
+1. **Lexique** : LGeRM Morphologique (Moyen Français), ~80 000 formes attestées
+   ([source](https://github.com/ILR-Stuttgart/old-french-lemmatization-tools)).
+   Non versionné (licence ATILF) — `ensure_lexicon()` le télécharge.
+2. **Détection** : un mot absent du lexique (et/ou de confiance faible) est suspect.
+3. **Candidats** : formes du lexique à distance d'édition ≤ 2.
+4. **Choix** :
+   - défaut : candidat le plus proche (lexique seul) ;
+   - contextuel : modèle de langue masqué (**D'AlemBERT**, pré-entraîné, figé)
+     qui note chaque candidat dans la phrase et garde le plus probable.
+
+**Résultats observés** (cas `eusemble`) : les deux méthodes choisissent
+`ensemble` ; D'AlemBERT lui donne une probabilité ~5× supérieure à CamemBERT
+(mieux calé sur la langue ancienne). **Limites** : le gain global est marginal
+car le HTR est déjà performant (CER ~6 %) ; les échecs viennent surtout de la
+*génération de candidats* (mot juste absent du voisinage) plus que du choix.
+`transformers` est une dépendance **optionnelle** (extra `correct`).
+
+## 6. Reproductibilité
 
 - Seeds fixés (bootstrap CER : `seed=42`).
 - Dépendances versionnées (`pyproject.toml`, extra `nlp`).

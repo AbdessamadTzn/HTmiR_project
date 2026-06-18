@@ -39,10 +39,17 @@ viz = [
     "huggingface_hub>=0.23",
     "psycopg2-binary>=2.9",
 ]
-# Post-traitement NLP
+# Post-traitement NLP (data contract, normalisation, lexique)
 nlp = [
     "jsonschema>=4.0",
     "psycopg2-binary>=2.9",
+]
+# Correction contextuelle par modèle de langue (optionnel, lourd) —
+# à installer dans un env séparé (conflit de 'click' avec kraken).
+correct = [
+    "transformers>=4.40",
+    "torch>=2.1",
+    "sentencepiece>=0.2",
 ]
 
 [project.scripts]
