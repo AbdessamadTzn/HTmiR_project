@@ -45,8 +45,9 @@ def _load_training_rows() -> list[dict]:
     return []
 
 
-tab_overview, tab_data, tab_train, tab_eval, tab_demo = st.tabs(
-    ["Vue d'ensemble", "Dataset", "Entraînement", "Évaluation", "🔍 Tester le modèle"]
+tab_overview, tab_data, tab_train, tab_eval, tab_demo, tab_nlp = st.tabs(
+    ["Vue d'ensemble", "Dataset", "Entraînement", "Évaluation",
+     "🔍 Tester le modèle", "🔤 NLP"]
 )
 
 
@@ -379,5 +380,83 @@ with tab_demo:
                         st.warning("Kraken n'a produit aucune sortie.")
     else:
         st.info("Upload une image ci-dessus pour lancer la transcription.")
+
+
+# ── 7. NLP (post-traitement, lecture Supabase) ───────────────────────────────
+with tab_nlp:
+    import os
+
+    st.header("🔤 NLP — post-traitement & CER avant/après")
+    st.caption(
+        "Runs d'évaluation (data contract → normalisation → CER) stockés sur "
+        "Supabase. Voir `CONVENTIONS_NLP.md` pour la méthodologie."
+    )
+
+    def _database_url() -> str | None:
+        try:
+            if "DATABASE_URL" in st.secrets:
+                return st.secrets["DATABASE_URL"]
+        except Exception:  # noqa: BLE001
+            pass
+        return os.environ.get("DATABASE_URL")
+
+    @st.cache_data(ttl=60, show_spinner="Lecture des runs Supabase…")
+    def _load_runs(url: str) -> list[dict]:
+        from htmir.nlp.db import fetch_runs
+        return fetch_runs(database_url=url)
+
+    db_url = _database_url()
+    if not db_url:
+        st.info(
+            "Base non configurée. Ajoute `DATABASE_URL` dans les *Secrets* "
+            "Streamlit (ou en variable d'environnement) pour afficher les runs."
+        )
+    else:
+        try:
+            runs = _load_runs(db_url)
+        except Exception as exc:  # noqa: BLE001
+            runs = []
+            st.error(f"Connexion Supabase échouée : {exc}")
+
+        if not runs:
+            st.warning("Aucun run enregistré pour l'instant.")
+        else:
+            df = pd.DataFrame(runs)
+            latest = df.iloc[0]
+
+            c1, c2, c3, c4 = st.columns(4)
+            c1.metric("CER brut", f"{latest['cer_raw']:.2%}"
+                      if latest.get("cer_raw") is not None else "—")
+            c2.metric("CER normalisé", f"{latest['cer_normalized']:.2%}"
+                      if latest.get("cer_normalized") is not None else "—")
+            delta = (latest["cer_raw"] - latest["cer_normalized"]) \
+                if latest.get("cer_raw") and latest.get("cer_normalized") else None
+            c3.metric("Gain normalisation",
+                      f"{delta:+.2%}" if delta is not None else "—")
+            c4.metric("Taux needs_review", f"{latest['needs_review_rate']:.1%}"
+                      if latest.get("needs_review_rate") is not None else "—")
+
+            # CER brut vs normalisé par run
+            st.subheader("CER avant / après par run")
+            plot_df = df[["manuscript", "cer_raw", "cer_normalized"]].melt(
+                id_vars="manuscript", var_name="mesure", value_name="cer"
+            )
+            st.altair_chart(
+                alt.Chart(plot_df).mark_bar().encode(
+                    x=alt.X("manuscript:N", title="Manuscrit"),
+                    xOffset="mesure:N",
+                    y=alt.Y("cer:Q", title="CER", axis=alt.Axis(format="%")),
+                    color="mesure:N",
+                    tooltip=["manuscript", "mesure", alt.Tooltip("cer", format=".2%")],
+                ),
+                use_container_width=True,
+            )
+
+            st.subheader("Détail des runs")
+            st.dataframe(
+                df[["created_at", "manuscript", "title", "n_pages", "n_lines",
+                    "cer_raw", "cer_normalized", "needs_review_rate", "iou_mean"]],
+                use_container_width=True, hide_index=True,
+            )
 
 

@@ -1,6 +1,6 @@
 """Smoke test du dashboard Streamlit via AppTest.
 
-Vérifie que l'app se charge et rend ses 5 onglets sans lever d'exception,
+Vérifie que l'app se charge et rend ses 6 onglets sans lever d'exception,
 y compris quand aucun artefact (données, métriques, rapport) n'est présent.
 """
 
@@ -16,8 +16,8 @@ def test_dashboard_runs_without_data():
     """Sans données, l'app doit se charger et afficher des messages info."""
     at = AppTest.from_file(DASHBOARD, default_timeout=30).run()
     assert not at.exception
-    # Les 5 onglets sont présents
-    assert len(at.tabs) == 5
+    # Les 6 onglets sont présents
+    assert len(at.tabs) == 6
 
 
 def test_dashboard_runs_with_manifest(tmp_path, monkeypatch):
