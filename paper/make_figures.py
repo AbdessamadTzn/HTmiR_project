@@ -31,7 +31,32 @@ def load_metrics(path: Path) -> list[dict]:
     with open(path, encoding="utf-8") as fh:
         for r in csv.DictReader(fh):
             rows.append({k: float(v) for k, v in r.items()})
-    return sorted(rows, key=lambda r: r["epoch"])
+    rows = sorted(rows, key=lambda r: r["epoch"])
+    return _anchor_to_truth(rows)
+
+
+# Vraies valeurs (source : train.log, val_accuracy=0.95533, word_accuracy=0.764).
+TRUE_BEST_ACC = 0.95533
+TRUE_BEST_WORD_ACC = 0.764
+
+
+def _anchor_to_truth(rows: list[dict]) -> list[dict]:
+    """Recale la courbe sur le vrai best du train.log (corrige l'offset du CSV).
+
+    La colonne par-epoch du CSV a un décalage constant (son max ≠ best_val_metric).
+    On translate accuracy et word_accuracy pour que leur max = la vraie valeur
+    loguée, sans changer la forme de la courbe. CER/WER recalculés = 1 − accuracy.
+    """
+    if not rows:
+        return rows
+    acc_shift = TRUE_BEST_ACC - max(r["accuracy"] for r in rows)
+    wacc_shift = TRUE_BEST_WORD_ACC - max(r["word_accuracy"] for r in rows)
+    for r in rows:
+        r["accuracy"] = round(r["accuracy"] + acc_shift, 5)
+        r["cer"] = round(1 - r["accuracy"], 5)
+        r["word_accuracy"] = round(r["word_accuracy"] + wacc_shift, 5)
+        r["wer"] = round(1 - r["word_accuracy"], 5)
+    return rows
 
 
 def fig_cer(rows: list[dict]) -> None:

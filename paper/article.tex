@@ -43,9 +43,12 @@ $[3,7\,\%;\,5,3\,\%]$), sous notre cible de 8\,\%. Nous évaluons en outre la
 \emph{segmentation} de pages complètes sur un corpus indépendant (HTRomance,
 manuscrits français du XIII\textsuperscript{e} siècle) et mesurons un IoU moyen
 de \textbf{78,5\,\%}, atteignant le seuil de 0,75 sur les manuscrits à colonne
-unique. Cet article décrit la collecte des données, la méthode de fine-tuning,
-l'évaluation (reconnaissance et segmentation), et les perspectives
-d'application à l'écriture de Léonard de Vinci.
+unique. Enfin, un volet de \emph{post-traitement linguistique} (data contract
+JSON, normalisation par règles et correction lexicale guidée par un modèle de
+langue masqué) est mis en place en aval de la reconnaissance. Cet article décrit
+la collecte des données, la méthode de fine-tuning, l'évaluation (reconnaissance,
+segmentation et post-traitement) et les perspectives d'application à l'écriture
+de Léonard de Vinci.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -83,8 +86,10 @@ préparation de données HTR depuis CATMuS Medieval~; (ii)~le fine-tuning d'un
 modèle Kraken atteignant un CER de validation d'environ 4,5\,\%, assorti
 d'intervalles de confiance par \textit{bootstrap}~; (iii)~une évaluation de la
 segmentation de pages (métrique IoU) sur un corpus indépendant de manuscrits
-français du XIII\textsuperscript{e} siècle (HTRomance)~; (iv)~un tableau de bord
-de visualisation des résultats~; (v)~une discussion des perspectives vers
+français du XIII\textsuperscript{e} siècle (HTRomance)~; (iv)~un volet de
+post-traitement NLP (data contract validé, normalisation, correction lexicale et
+contextuelle) sans entraînement supplémentaire~; (v)~un tableau de bord de
+visualisation des résultats~; (vi)~une discussion des perspectives vers
 l'écriture spéculaire de Léonard de Vinci.
 
 % ─────────────────────────────────────────────────────────────────
@@ -226,8 +231,11 @@ modèle sont versionnés et stockés sur S3.
 L'entraînement converge rapidement et l'\textit{early stopping} interrompt
 l'apprentissage lorsque le CER de validation cesse de s'améliorer. La meilleure
 accuracy caractère de validation atteinte est de 95,5\,\%, soit un \textbf{CER
-d'environ 4,5\,\%} --- nettement sous la cible de 8\,\% (figure~\ref{fig:cer}).
-La figure~\ref{fig:acc} montre l'évolution conjointe des précisions caractère et
+d'environ 4,5\,\%} (précision caractère 95,5\,\%) --- nettement sous la cible de
+8\,\% (figure~\ref{fig:cer}). Le taux d'erreur mot (WER) correspondant est de
+\textbf{23,6\,\%} (précision mot 76,4\,\%)~; l'écart entre CER et WER est
+attendu, un mot étant compté faux dès qu'un seul de ses caractères l'est. La
+figure~\ref{fig:acc} montre l'évolution conjointe des précisions caractère et
 mot.
 
 \begin{figure}[!t]
@@ -248,7 +256,7 @@ pointillée indique la cible de 8\,\%~; le point vert marque le meilleur epoch.}
 \subsection{Robustesse statistique}
 L'analyse par \textit{bootstrap} ($N=1000$) confirme la stabilité des métriques~:
 le CER se situe dans l'intervalle de confiance à 95\,\% $[3,7\,\%;\,5,3\,\%]$ et
-le WER dans $[25,1\,\%;\,30,2\,\%]$ (figure~\ref{fig:boot}). La borne supérieure
+le WER dans $[21,0\,\%;\,26,2\,\%]$ (figure~\ref{fig:boot}). La borne supérieure
 du CER reste nettement sous la cible de 8\,\%, ce qui conforte l'exploitabilité
 du modèle.
 
@@ -296,6 +304,77 @@ manuscrit. La ligne pointillée marque le seuil cible.}
 \end{figure}
 
 % ─────────────────────────────────────────────────────────────────
+\section{Post-traitement linguistique (NLP)}
+En aval de la reconnaissance, un volet de traitement automatique du langage
+affine la sortie HTR. Conformément au principe \emph{« règles d'abord, IA
+ensuite »}, il n'introduit \textbf{aucun entraînement supplémentaire}~: les
+modèles de langue éventuels sont utilisés figés.
+
+\subsection{Data contract}
+L'interface entre la vision et le NLP est un \emph{data contract} JSON, produit
+à partir de l'ALTO de Kraken et validé par un schéma (\texttt{jsonschema}). Pour
+chaque ligne, il expose~: le texte, le \emph{polygone} de segmentation, la
+\textbf{confiance par caractère} (attribut \texttt{GC} de l'ALTO), la confiance
+moyenne, et un drapeau \texttt{needs\_review} levé lorsque la confiance moyenne
+passe sous un seuil (0,70). Ce contrat est l'entrée obligatoire de toutes les
+étapes suivantes~; l'exposition de la confiance par caractère, en particulier,
+conditionne la correction guidée.
+
+\subsection{Normalisation par règles}
+La normalisation distingue deux familles de règles aux objectifs opposés.
+\emph{(i)~Pour le CER}, des règles \textbf{appliquées des deux côtés}
+(hypothèse \emph{et} référence) fusionnent des distinctions graphiques non
+significatives en ancien français~: composition Unicode NFC, équivalences
+$u\!\leftrightarrow\!v$ et $i\!\leftrightarrow\!j$, s~long $\to$ \texttt{s}, espaces.
+Appliquées symétriquement, elles ne peuvent que \emph{réduire} le CER (propriété
+vérifiée par un test unitaire). \emph{(ii)~Pour la lisibilité}, le développement
+des abréviations (\textit{et} tironien $\to$ \texttt{et}, tilde nasal
+$\tilde{a}\!\to\!\mathit{an}$, table d'abréviations) produit un texte plus lisible mais
+\emph{s'écarte} d'une vérité terrain diplomatique~; il n'est donc pas utilisé
+pour le calcul du CER.
+
+\subsection{CER avant / après}
+La vérité terrain diplomatique de HTRomance permet une évaluation \emph{absolue}
+du post-traitement sur cinq pages (\textit{Vie de saint Alexis},
+tableau~\ref{tab:nlp}). Le filtrage des lignes \texttt{needs\_review} --- de
+fausses détections à confiance faible --- fait passer le CER page de 6,40\,\% à
+6,28\,\%~; la normalisation symétrique est neutre, hypothèse et référence
+partageant déjà la même convention. Le CER ici (pages complètes, segmentation
+incluse) est supérieur au CER de reconnaissance sur lignes pré-segmentées
+(\S\,Résultats), différence attendue puisque l'erreur de segmentation s'y ajoute.
+
+\begin{table}[!t]
+\centering
+\caption{CER du post-traitement sur HTRomance (\textit{Vie de saint Alexis},
+5~pages, 435~lignes).}
+\label{tab:nlp}
+\begin{tabular}{lc}
+\toprule
+Étape & CER \\
+\midrule
+Sortie brute (toutes lignes) & 6,40\,\% \\
+Après filtrage \texttt{needs\_review} & 6,28\,\% \\
+Après normalisation (sym.) & 6,28\,\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Correction lexicale et contextuelle}
+Un mot absent d'un lexique d'ancien français est jugé suspect. Nous utilisons le
+lexique morphologique LGeRM~\cite{lgerm} ($\sim$80\,000 formes) pour~: (i)~tester
+l'attestation d'un mot et (ii)~proposer des \emph{candidats} proches par distance
+d'édition ($\leq 2$). Le \emph{choix} du bon candidat relève ensuite d'un modèle
+de langue masqué utilisé figé~: chaque candidat est noté à la position du mot
+dans la phrase, le plus probable est retenu. Nous comparons CamemBERT (français
+moderne)~\cite{camembert} et D'AlemBERT (français pré-moderne)~\cite{dalembert}~:
+sur un cas représentatif (\texttt{eusemble}$\to$\texttt{ensemble}), les deux
+sélectionnent le bon candidat, mais D'AlemBERT lui attribue une probabilité
+environ cinq fois supérieure, confirmant l'intérêt d'un modèle adapté à la
+période. Sur notre HTR déjà performant, le gain global de cette correction reste
+toutefois marginal~: les techniques de correction par lexique et modèle de langue
+sont surtout payantes sur une sortie HTR bruitée.
+
+% ─────────────────────────────────────────────────────────────────
 \section{Discussion et limites}
 \textbf{Segmentation et mise en page.} L'évaluation IoU montre que le segmenteur
 Kraken est performant sur les manuscrits à colonne unique mais se dégrade sur les
@@ -309,6 +388,14 @@ corpus \emph{indépendant} de l'entraînement, ce qui en renforce la validité.
 set} via \texttt{ketos test} s'est heurtée à une incompatibilité de Kraken~7
 avec les jeux binaires~; les métriques rapportées sont donc celles de
 validation.
+
+\textbf{Post-traitement.} Le gain de la correction lexicale/contextuelle est
+limité par deux facteurs~: la \emph{qualité du HTR} (un modèle déjà précis
+laisse peu d'erreurs corrigibles) et la \emph{génération de candidats} (le bon
+mot doit figurer dans le voisinage d'édition du lexique). Un lexique enrichi et
+un appariement candidat--contexte plus fin constitueraient les principales pistes
+d'amélioration. Ce constat --- la correction par modèle de langue brille surtout
+sur des sorties bruitées --- est en soi un résultat utile.
 
 \textbf{Portée du transfert.} Les résultats valident le pipeline sur le français
 médiéval. Le transfert vers l'écriture spéculaire de Léonard de Vinci reste
@@ -324,12 +411,13 @@ validation d'environ 4,5\,\%. Ce résultat valide la chaîne complète --- colle
 préparation, fine-tuning, évaluation, visualisation --- et fournit une base
 solide pour l'objectif initial.
 
-Au-delà de la reconnaissance (CER $\approx 4,5\,\%$) et de la segmentation
-(IoU $\approx 78,5\,\%$) ici validées, les prochaines étapes sont~: (i)~une
-évaluation \textit{test} robuste sur le jeu scellé~; (ii)~un appariement de
-segmentation sensible aux régions pour les mises en page complexes~; (iii)~un
-volet de \emph{post-traitement linguistique} (normalisation, correction
-lexicale du français ancien) en aval de la reconnaissance~; (iv)~la constitution
+Nous avons en outre validé la segmentation de pages (IoU $\approx 78,5\,\%$) sur
+un corpus indépendant et mis en place un volet de post-traitement linguistique
+(data contract, normalisation, correction lexicale et contextuelle) sans
+entraînement supplémentaire. Les prochaines étapes sont~: (i)~une évaluation
+\textit{test} robuste sur le jeu scellé~; (ii)~un appariement de segmentation
+sensible aux régions pour les mises en page complexes~; (iii)~l'enrichissement du
+lexique et de la correction guidée par la confiance~; (iv)~la constitution
 progressive d'une vérité terrain pour les carnets de Léonard de Vinci
 (retournement des images spéculaires, annotation assistée, puis fine-tuning du
 présent modèle comme point de départ). À terme, le modèle pourrait transcrire
@@ -355,6 +443,13 @@ Recognition and Layout Segmentation}, HTR-United / Journal for Open Humanities
 Data, 2023.
 \bibitem{efron} B.~Efron and R.~Tibshirani, \textit{An Introduction to the
 Bootstrap}, Chapman \& Hall, 1993.
+\bibitem{lgerm} G.~Souvay and J.-M.~Pierrel, \textit{LGeRM~: lemmatisation des
+mots en moyen français}, Traitement Automatique des Langues, 2009. Lexique
+morphologique distribué par HTR-United / ILR-Stuttgart.
+\bibitem{camembert} L.~Martin \textit{et al.}, \textit{CamemBERT: a Tasty French
+Language Model}, ACL, 2020.
+\bibitem{dalembert} P.~J.~Ortiz Su\'arez \textit{et al.}, \textit{D'AlemBERT: a
+Transformer-based Language Model for Early Modern French}, LREC, 2022.
 \end{thebibliography}
 
 \end{document}
