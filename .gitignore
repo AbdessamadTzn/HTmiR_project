@@ -228,6 +228,10 @@ data/[!c]*/
 data/c[!a]*/
 _dashboard_export/
 htmir-dashboard-artifacts.zip
+# Assets de présentation (générés localement)
+demo_*.jpg
+demo_*.png
+demo_*.txt
 
 # Sorties d'entrainement Kraken (checkpoints, poids)
 htmir-french-13c/
