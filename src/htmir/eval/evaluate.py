@@ -111,7 +111,7 @@ def bootstrap_ci(
     pairs: list[tuple[str, str]],
     n_bootstrap: int = 1000,
     alpha: float = 0.05,
-    seed: int = 42,
+    seed: int = 13,
 ) -> dict:
     """Intervalles de confiance bootstrap (rééchantillonnage) pour CER et WER.
 

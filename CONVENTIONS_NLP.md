@@ -85,7 +85,7 @@ car le HTR est déjà performant (CER ~6 %) ; les échecs viennent surtout de la
 
 ## 6. Reproductibilité
 
-- Seeds fixés (bootstrap CER : `seed=42`).
+- Seeds fixés (bootstrap CER : `seed=13`).
 - Dépendances versionnées (`pyproject.toml`, extra `nlp`).
 - Tests `pytest` : validation du schéma JSON + non-dégradation du CER par la
   normalisation.
