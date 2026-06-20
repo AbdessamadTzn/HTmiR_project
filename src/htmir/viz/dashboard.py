@@ -17,14 +17,14 @@ import streamlit as st
 
 from htmir.viz import data_loaders as dl
 
-st.set_page_config(page_title="HTmiR — Dashboard", layout="wide", page_icon="📜")
+st.set_page_config(page_title="HTmiR — Dashboard", layout="wide")
 
 CER_TARGET = 0.08  # cible projet : CER < 8 %
 
 _LOCAL_DATA = Path("data/catmus-french-13c")
 
 # ── Sidebar : chemins des artefacts ──────────────────────────────────────────
-st.sidebar.title("📜 HTmiR")
+st.sidebar.title("HTmiR")
 st.sidebar.caption("HTR français médiéval — XIIIe siècle (CATMuS)")
 
 data_dir = Path(st.sidebar.text_input("Répertoire données", str(_LOCAL_DATA)))
@@ -47,7 +47,7 @@ def _load_training_rows() -> list[dict]:
 
 tab_overview, tab_data, tab_train, tab_eval, tab_demo, tab_nlp = st.tabs(
     ["Vue d'ensemble", "Dataset", "Entraînement", "Évaluation",
-     "🔍 Tester le modèle", "🔤 NLP"]
+     "Tester le modèle", "NLP"]
 )
 
 
@@ -64,7 +64,7 @@ with tab_overview:
     best_cer = es.get("best_cer")
     c2.metric("Meilleur CER (val)", f"{best_cer:.1%}" if best_cer is not None else "—")
     c3.metric("Best epoch", es.get("best_epoch", "—") if es else "—")
-    status = "✅ entraîné" if train_rows else "⏳ en attente"
+    status = "entraîné" if train_rows else "en attente"
     c4.metric("Statut", status)
 
     if best_cer is not None:
@@ -73,7 +73,7 @@ with tab_overview:
         ok = best_cer <= CER_TARGET
         st.progress(pct if ok else 0.0)
         st.caption(
-            f"{'🎯 Cible atteinte' if ok else '🔴 Au-dessus de la cible'} — "
+            f"{'Cible atteinte' if ok else 'Au-dessus de la cible'} — "
             f"CER {best_cer:.1%} (cible < {CER_TARGET:.0%})"
         )
 
@@ -175,9 +175,9 @@ with tab_train:
         m3.metric("Arrêt early-stopping",
                   es["stop_epoch"] if es["stop_epoch"] is not None else "non déclenché")
         st.caption(
-            f"🟢 epoch {es['best_epoch']} = meilleur modèle conservé • "
-            f"🟠 epochs sans amélioration : {es['stalled_epochs'] or 'aucun'} • "
-            f"🔴 ligne pointillée = cible CER {CER_TARGET:.0%}"
+            f"epoch {es['best_epoch']} = meilleur modèle conservé • "
+            f"epochs sans amélioration : {es['stalled_epochs'] or 'aucun'} • "
+            f"ligne pointillée = cible CER {CER_TARGET:.0%}"
         )
 
         if "accuracy" in df.columns:
@@ -243,7 +243,7 @@ with tab_eval:
                 ic1, ic2 = st.columns(2)
                 ok_iou = mean_iou >= threshold
                 ic1.metric("IoU moyen (tous manuscrits)", f"{mean_iou:.2%}",
-                           delta="✅ seuil atteint" if ok_iou else f"⚠️ sous seuil {threshold:.0%}")
+                           delta="seuil atteint" if ok_iou else f"sous seuil {threshold:.0%}")
                 ic2.metric(f"Lignes IoU ≥ {threshold:.0%}",
                            f"{pct:.1%}" if pct is not None else "—")
                 # Détail par manuscrit
@@ -258,7 +258,7 @@ with tab_eval:
                             f"≥ {threshold:.0%}": f"{ms['pct_above_threshold']:.1%}",
                             "Lignes": ms.get("n_lines", "—"),
                             "Pages": ms.get("n_pages", "—"),
-                            "Seuil OK": "✅" if ms["mean_iou"] >= threshold else "⚠️",
+                            "Seuil OK": "oui" if ms["mean_iou"] >= threshold else "non",
                         })
                     st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
                 st.caption(iou.get("note", ""))
@@ -289,7 +289,7 @@ with tab_demo:
     import shutil
     import tempfile
 
-    st.header("🔍 Tester le modèle sur une image")
+    st.header("Tester le modèle sur une image")
     st.caption(
         "Upload une image de manuscrit (PNG/JPG) → Kraken segmente les lignes "
         "et transcrit avec le modèle fine-tuné."
@@ -365,13 +365,13 @@ with tab_demo:
                         st.caption(f"{len(lignes)} ligne(s) transcrite(s)")
                         dc1, dc2 = st.columns(2)
                         dc1.download_button(
-                            "⬇️ ALTO XML",
+                            "ALTO XML",
                             data=alto,
                             file_name=f"{img_path.stem}.xml",
                             mime="application/xml",
                         )
                         dc2.download_button(
-                            "⬇️ Texte brut",
+                            "Texte brut",
                             data=texte,
                             file_name=f"{img_path.stem}.txt",
                             mime="text/plain",
@@ -386,7 +386,7 @@ with tab_demo:
 with tab_nlp:
     import os
 
-    st.header("🔤 NLP — post-traitement & CER avant/après")
+    st.header("NLP — post-traitement & CER avant/après")
     st.caption(
         "Runs d'évaluation (data contract → normalisation → CER) stockés sur "
         "Supabase. Voir `CONVENTIONS_NLP.md` pour la méthodologie."
