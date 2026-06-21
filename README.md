@@ -170,6 +170,8 @@ tests/                      unit tests (pytest)
 
 ## 8. Research article
 
+**Status: work in progress** — the article is still being finalized.
+
 The deliverable follows the standard research-article structure (abstract,
 introduction, related work, methods, results, discussion, conclusion,
 bibliography, appendices). Source and auto-generated figures are in `paper/`:

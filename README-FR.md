@@ -174,6 +174,8 @@ tests/                      tests unitaires (pytest)
 
 ## 8. Article de recherche
 
+**Statut : en cours** — l'article est encore en cours de finalisation.
+
 Le livrable suit la structure normalisée d'un article de recherche (résumé,
 introduction, travaux liés, méthodes, résultats, discussion, conclusion,
 bibliographie, annexes). Sources et figures générées automatiquement dans
